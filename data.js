@@ -15,7 +15,7 @@ const PORTFOLIO = {
   email: "pannawatmoonjaroen.com",
   github: "https://github.com/Pannawat2008",
   linkedin: "https://linkedin.com/",
-  instagram: "https://github.com/Pannawat2008",      // put your Instagram profile URL here
+  instagram: "https://www.instagram.com/setyorxeuro?igsh=MTJkN3RlbG1sano1aA==",      // put your Instagram profile URL here
 
   // ── ABOUT ──────────────────────────────────────────────────
   about: [
