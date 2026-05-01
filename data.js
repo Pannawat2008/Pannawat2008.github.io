@@ -12,9 +12,9 @@ const PORTFOLIO = {
   tagline: "Crafting elegant solutions at the intersection of hardware and software.",
   status: "Available for opportunities",   // shown as badge in hero
   photo: "",                              // put "assets/images/profile.jpg" when ready
-  email: "euro@example.com",
-  github: "https://github.com/",
-  linkedin: "https://linkedin.com/",
+  email: "pannawatmoonjaroen.com",
+  github: "https://github.com/Pannawat2008",
+  Instragram: "https://linkedin.com/",
 
   // ── ABOUT ──────────────────────────────────────────────────
   about: [
