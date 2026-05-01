@@ -11,8 +11,8 @@ const PORTFOLIO = {
   title: "Electronic Designer · Semiconductor Engineer · Software Engineer",
   tagline: "Crafting elegant solutions at the intersection of hardware and software.",
   status: "Available for opportunities",   // shown as badge in hero
-  photo: "assets\images\Profile.jpg",      // put "assets/images/profile.jpg" when ready
-  email: "pannawatmoonjaroen.com",
+  photo: "Pannawat2008.github.io/assets/images/Profile.png",      // put "assets/images/profile.jpg" when ready
+  email: "pannawatmoonjaroen@gmail.com",
   github: "https://github.com/Pannawat2008",
   linkedin: "https://linkedin.com/",
   instagram: "https://www.instagram.com/setyorxeuro?igsh=MTJkN3RlbG1sano1aA==",      // put your Instagram profile URL here
