@@ -11,7 +11,7 @@ const PORTFOLIO = {
   title: "Electronic Designer · Semiconductor Engineer · Software Engineer",
   tagline: "Crafting elegant solutions at the intersection of hardware and software.",
   status: "Available for opportunities",   // shown as badge in hero
-  photo: "Pannawat2008.github.io/assets/images/Profile.jpg",      // put "assets/images/profile.jpg" when ready
+  photo: "assets/images/Profile.jpg",      // put "assets/images/profile.jpg" when ready
   email: "pannawatmoonjaroen@gmail.com",
   github: "https://github.com/Pannawat2008",
   linkedin: "https://linkedin.com/",
