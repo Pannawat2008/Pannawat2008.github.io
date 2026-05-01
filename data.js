@@ -14,7 +14,8 @@ const PORTFOLIO = {
   photo: "",                              // put "assets/images/profile.jpg" when ready
   email: "pannawatmoonjaroen.com",
   github: "https://github.com/Pannawat2008",
-  Instragram: "https://linkedin.com/",
+  linkedin: "https://linkedin.com/",
+  instagram: "https://github.com/Pannawat2008",      // put your Instagram profile URL here
 
   // ── ABOUT ──────────────────────────────────────────────────
   about: [

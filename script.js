@@ -82,10 +82,11 @@ p.blog.forEach(post => {
 
 
 // ── CONTACT ─────────────────────────────────────────────────
-document.getElementById('contact-github').href   = p.github;
+document.getElementById('contact-github').href = p.github;
 document.getElementById('contact-linkedin').href = p.linkedin;
+document.getElementById('contact-instagram').href = p.instagram;
 document.getElementById('contact-email-btn').href = `mailto:${p.email}`;
-document.getElementById('contact-email-display').href        = `mailto:${p.email}`;
+document.getElementById('contact-email-display').href = `mailto:${p.email}`;
 document.getElementById('contact-email-display').textContent = p.email;
 
 
