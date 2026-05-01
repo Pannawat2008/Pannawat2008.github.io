@@ -6,21 +6,21 @@
 const PORTFOLIO = {
 
   // ── YOUR IDENTITY ──────────────────────────────────────────
-  name:       "Pannawat Moonjaroen",
-  nickname:   "Euro",
-  title:      "Electronic Designer · Semiconductor Engineer · Software Engineer",
-  tagline:    "Crafting elegant solutions at the intersection of hardware and software.",
-  status:     "Available for opportunities",   // shown as badge in hero
-  photo:      "",                              // put "assets/images/profile.jpg" when ready
-  email:      "euro@example.com",
-  github:     "https://github.com/",
-  linkedin:   "https://linkedin.com/",
+  name: "Pannawat Moonjaroen",
+  nickname: "Euro",
+  title: "Electronic Designer · Semiconductor Engineer · Software Engineer",
+  tagline: "Crafting elegant solutions at the intersection of hardware and software.",
+  status: "Available for opportunities",   // shown as badge in hero
+  photo: "",                              // put "assets/images/profile.jpg" when ready
+  email: "euro@example.com",
+  github: "https://github.com/",
+  linkedin: "https://linkedin.com/",
 
   // ── ABOUT ──────────────────────────────────────────────────
   about: [
-    "I'm Pannawat Moonjaroen, a passionate engineer working at the convergence of electronic design, semiconductor technology, and software development. I believe elegant engineering is both functional and beautiful.",
-    "My journey spans from designing electronic circuits and working with semiconductor components, to writing clean and efficient software. I enjoy solving complex problems that require deep understanding across multiple disciplines.",
-    "When I'm not engineering, I'm exploring the latest advancements in chip design, embedded systems, and how software can push the limits of hardware."
+    "I'm Pannawat Moonjaroen, a passionate student working at the convergence of electronic design, semiconductor technology, and software development. I believe engineering is functional and beautiful.",
+    "My journey spans from designing electronic circuits and interested in working with semiconductor components, to writing clean and efficient software. I enjoy solving complex problems that require deep understanding across multiple disciplines.",
+    "When I'm not doing school work, I'm exploring the latest advancements in AI and how software can push the limits of hardware."
   ],
 
   // ── SKILLS ─────────────────────────────────────────────────
