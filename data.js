@@ -16,7 +16,13 @@ const PORTFOLIO = {
   github: "https://github.com/Pannawat2008",
   linkedin: "https://linkedin.com/",
   instagram: "https://www.instagram.com/setyorxeuro?igsh=MTJkN3RlbG1sano1aA==",      // put your Instagram profile URL here
-
+  // ----- certificates ----------------------
+  
+  certificates: [
+  { title: "AWS Cloud Practitioner", org: "Amazon", year: "2024" },
+    { title: "PCB Design Basics", org: "Coursera", year: "2023" },
+  ],
+    
   // ── ABOUT ──────────────────────────────────────────────────
   about: [
     "I'm Pannawat Moonjaroen, a passionate student working at the convergence of electronic design, semiconductor technology, and software development. I believe engineering is functional and beautiful.",

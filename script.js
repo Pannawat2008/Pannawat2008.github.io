@@ -52,6 +52,17 @@ p.skills.forEach(skill => {
 });
 
 
+
+// --Cretificate--------------
+const certsGrid = document.getElementById("certs-grid");
+p.certificates.forEach((cert) => {
+  certsGrid.innerHTML += `
+  <div class="skill-card reveal">
+  <h3 class="skill-category">${cert.title}</h3>
+  <p>${cert.org} · ${cert.year}</p>
+  </div>`;
+});
+
 // ── PROJECTS ────────────────────────────────────────────────
 const projectsGrid = document.getElementById('projects-grid');
 p.projects.forEach(proj => {
