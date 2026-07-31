@@ -4,173 +4,997 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>3D Voronoi & Honeycomb Generator</title>
+  <meta name="description" content="Parametric 3D Voronoi & Honeycomb pattern generator. Export to STL for 3D printing or SVG for laser cutting." />
   
   <!-- Google Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-  
-  <!-- Stylesheet -->
-  <link rel="stylesheet" href="style.css" />
+
+  <style>
+    :root {
+      --bg: #F8F9FA;
+      --surface: #FFFFFF;
+      --border: #E0E0E0;
+      --blue: #1A73E8;
+      --blue-hover: #1557B0;
+      --blue-light: #E8F0FE;
+      --text: #202124;
+      --text2: #5F6368;
+      --text3: #9AA0A6;
+      --green: #34A853;
+      --shadow: 0 1px 3px rgba(60,64,67,.15),0 1px 2px rgba(60,64,67,.12);
+      --shadow2: 0 4px 12px rgba(60,64,67,.18);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      height: 100vh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* HEADER */
+    .header {
+      height: 58px;
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 20px;
+      flex-shrink: 0;
+    }
+    .brand { display: flex; align-items: center; gap: 12px; }
+    .logo {
+      width: 34px; height: 34px;
+      background: linear-gradient(135deg, var(--blue), var(--green));
+      border-radius: 9px;
+      display: flex; align-items: center; justify-content: center;
+      color: #fff; font-weight: 700; font-size: 14px; letter-spacing: -0.5px;
+    }
+    .brand-text h1 { font-size: 16px; font-weight: 600; }
+    .brand-text p { font-size: 12px; color: var(--text2); font-weight: 400; }
+    .gh-link {
+      display: flex; align-items: center; gap: 6px;
+      text-decoration: none; color: var(--text2);
+      font-size: 13px; font-weight: 500;
+      background: var(--blue-light); color: var(--blue);
+      padding: 6px 14px; border-radius: 20px;
+      transition: background .15s;
+    }
+    .gh-link:hover { background: #D2E3FC; }
+
+    /* LAYOUT */
+    .workspace { display: flex; flex: 1; overflow: hidden; }
+
+    /* SIDEBAR */
+    .sidebar {
+      width: 320px;
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      overflow-y: auto;
+      padding: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      flex-shrink: 0;
+    }
+    .card {
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 14px;
+    }
+    .card-label {
+      font-size: 11px; font-weight: 700;
+      color: var(--blue); text-transform: uppercase;
+      letter-spacing: .6px; margin-bottom: 12px;
+    }
+    .ctrl { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
+    .ctrl:last-child { margin-bottom: 0; }
+    .lrow {
+      display: flex; justify-content: space-between;
+      font-size: 12px; color: var(--text2); font-weight: 500;
+    }
+    .lval { font-weight: 700; color: var(--text); }
+
+    /* Slider */
+    input[type=range] {
+      -webkit-appearance: none; width: 100%;
+      height: 5px; background: #E8EAED; border-radius: 3px; outline: none;
+    }
+    input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none; width: 17px; height: 17px;
+      border-radius: 50%; background: var(--blue); cursor: pointer;
+      box-shadow: 0 1px 3px rgba(0,0,0,.2);
+      transition: transform .1s;
+    }
+    input[type=range]::-webkit-slider-thumb:hover { transform: scale(1.2); }
+
+    /* Segmented */
+    .seg {
+      display: flex; background: var(--bg);
+      border: 1px solid var(--border); border-radius: 9px; padding: 3px; gap: 3px;
+    }
+    .seg-btn {
+      flex: 1; border: none; background: transparent;
+      padding: 7px 6px; font-size: 11px; font-weight: 500;
+      color: var(--text2); border-radius: 7px; cursor: pointer;
+      transition: all .15s;
+    }
+    .seg-btn.active {
+      background: var(--surface); color: var(--blue);
+      font-weight: 700; box-shadow: var(--shadow);
+    }
+
+    /* Color */
+    .color-row { display: flex; align-items: center; justify-content: space-between; }
+    input[type=color] {
+      -webkit-appearance: none; border: none;
+      width: 34px; height: 34px; border-radius: 50%; cursor: pointer; overflow: hidden;
+    }
+    input[type=color]::-webkit-color-swatch-wrapper { padding: 0; }
+    input[type=color]::-webkit-color-swatch { border: 2px solid var(--border); border-radius: 50%; }
+
+    /* Buttons */
+    .btn {
+      display: flex; align-items: center; justify-content: center; gap: 7px;
+      width: 100%; padding: 10px 14px; font-size: 13px; font-weight: 600;
+      border-radius: 22px; border: none; cursor: pointer;
+      transition: all .15s;
+    }
+    .btn-blue { background: var(--blue); color: #fff; }
+    .btn-blue:hover { background: var(--blue-hover); box-shadow: var(--shadow2); }
+    .btn-light { background: var(--blue-light); color: var(--blue); }
+    .btn-light:hover { background: #D2E3FC; }
+    .btn-outline {
+      background: transparent; border: 1px solid var(--border); color: var(--text2);
+    }
+    .btn-outline:hover { background: var(--bg); color: var(--text); }
+    .btn-group { display: flex; flex-direction: column; gap: 8px; }
+
+    /* STATUS */
+    .status-bar {
+      font-size: 11px; color: var(--text3); text-align: center;
+      padding: 6px 0 2px; font-weight: 500;
+    }
+    .status-bar.ok { color: #34A853; }
+    .status-bar.err { color: #EA4335; }
+
+    /* VIEWPORT */
+    .viewport { flex: 1; position: relative; }
+    #canvas3d { width: 100%; height: 100%; display: block; }
+    .v-overlay {
+      position: absolute; bottom: 16px; right: 16px;
+      display: flex; gap: 8px;
+    }
+    .v-btn {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 20px; padding: 7px 15px;
+      font-size: 12px; font-weight: 500; color: var(--text2);
+      box-shadow: var(--shadow); cursor: pointer; transition: all .15s;
+    }
+    .v-btn:hover { color: var(--blue); box-shadow: var(--shadow2); }
+
+    /* Loading overlay */
+    #loading {
+      position: absolute; inset: 0;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      background: var(--bg);
+      font-size: 14px; color: var(--text2);
+      gap: 12px;
+    }
+    .spinner {
+      width: 36px; height: 36px;
+      border: 3px solid var(--border);
+      border-top-color: var(--blue);
+      border-radius: 50%;
+      animation: spin .8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+  </style>
 </head>
 <body>
 
-  <div id="app-container">
-    
-    <!-- HEADER -->
-    <header class="header">
-      <div class="header-brand">
-        <div class="header-logo">V3D</div>
-        <div>
-          <h1 class="header-title">Voronoi & Honeycomb 3D</h1>
-          <p class="header-subtitle">Parametric 3D Pattern Generator & STL Exporter</p>
-        </div>
+  <!-- HEADER -->
+  <header class="header">
+    <div class="brand">
+      <div class="logo">V3D</div>
+      <div class="brand-text">
+        <h1>Voronoi &amp; Honeycomb 3D</h1>
+        <p>Parametric 3D Pattern Generator &amp; STL Exporter</p>
       </div>
-      <div class="header-actions">
-        <a href="https://github.com/Pannawat2008/Pannawat2008.github.io" target="_blank" class="github-link">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/>
-          </svg>
-          GitHub
-        </a>
-      </div>
-    </header>
-
-    <!-- MAIN CONTENT -->
-    <div class="main-content">
-      
-      <!-- SIDEBAR CONTROLS -->
-      <aside class="sidebar">
-        
-        <!-- CARD 1: PATTERN DENSITY & BLEND -->
-        <div class="card">
-          <div class="card-title">Pattern & Blending</div>
-
-          <div class="control-group">
-            <div class="control-label-row">
-              <span>Seed Count</span>
-              <span class="control-value" id="val-seeds">40</span>
-            </div>
-            <input type="range" id="slider-seeds" min="10" max="150" value="40" step="1" />
-          </div>
-
-          <div class="control-group">
-            <div class="control-label-row">
-              <span>Honeycomb Blend</span>
-              <span class="control-value" id="val-blend">50%</span>
-            </div>
-            <input type="range" id="slider-blend" min="0" max="1" value="0.5" step="0.05" />
-          </div>
-
-          <div class="control-group">
-            <button class="btn btn-outline" id="btn-randomize">
-              🎲 Randomize Voronoi Seeds
-            </button>
-          </div>
-        </div>
-
-        <!-- CARD 2: GEOMETRY & EXTRUSION -->
-        <div class="card">
-          <div class="card-title">3D Geometry & Spacing</div>
-
-          <div class="control-group">
-            <div class="control-label-row">
-              <span>Cell Spacing (Walls)</span>
-              <span class="control-value" id="val-spacing">2.5 mm</span>
-            </div>
-            <input type="range" id="slider-spacing" min="0.5" max="10" value="2.5" step="0.5" />
-          </div>
-
-          <div class="control-group">
-            <div class="control-label-row">
-              <span>Extrusion Height</span>
-              <span class="control-value" id="val-depth">12.0 mm</span>
-            </div>
-            <input type="range" id="slider-depth" min="2" max="50" value="12" step="1" />
-          </div>
-
-          <div class="control-group">
-            <div class="control-label-row">
-              <span>Panel Width</span>
-              <span class="control-value" id="val-width">200 mm</span>
-            </div>
-            <input type="range" id="slider-width" min="80" max="400" value="200" step="10" />
-          </div>
-
-          <div class="control-group">
-            <div class="control-label-row">
-              <span>Panel Height</span>
-              <span class="control-value" id="val-height">120 mm</span>
-            </div>
-            <input type="range" id="slider-height" min="60" max="300" value="120" step="10" />
-          </div>
-        </div>
-
-        <!-- CARD 3: STYLES & MODES -->
-        <div class="card">
-          <div class="card-title">Extrusion Mode & Style</div>
-
-          <div class="control-group">
-            <div class="control-label-row" style="margin-bottom:6px;">Extrusion Mode</div>
-            <div class="segmented-control">
-              <button class="segmented-btn active" data-mode="walls">Walls</button>
-              <button class="segmented-btn" data-mode="cells">Cells</button>
-              <button class="segmented-btn" data-mode="through-cut">Through</button>
-            </div>
-          </div>
-
-          <div class="control-group">
-            <div class="control-label-row" style="margin-bottom:6px;">Edge Smoothing</div>
-            <div class="segmented-control">
-              <button class="segmented-btn active" data-curve="cubic">Cubic</button>
-              <button class="segmented-btn" data-curve="quadratic">Quad</button>
-              <button class="segmented-btn" data-curve="straight">Linear</button>
-            </div>
-          </div>
-
-          <div class="control-group color-picker-row">
-            <span style="font-size:13px; font-weight:500; color:var(--text-secondary);">Preview Color</span>
-            <input type="color" id="input-color" value="#4285F4" />
-          </div>
-        </div>
-
-        <!-- CARD 4: EXPORT OPTIONS -->
-        <div class="card">
-          <div class="card-title">Export Options</div>
-          <div style="display:flex; flex-direction:column; gap:10px;">
-            <button class="btn btn-primary" id="btn-export-stl">
-              📥 Export 3D STL (for 3D Printing)
-            </button>
-            <button class="btn btn-secondary" id="btn-export-svg">
-              📄 Export 2D SVG (for Laser Cutting)
-            </button>
-          </div>
-        </div>
-
-      </aside>
-
-      <!-- 3D VIEWPORT -->
-      <main class="viewport-container">
-        <div id="viewport-3d"></div>
-        <div class="viewport-overlay">
-          <button class="overlay-btn" id="btn-reset-view">🎯 Reset Camera</button>
-        </div>
-      </main>
-
     </div>
+    <a href="https://github.com/Pannawat2008/Pannawat2008.github.io" target="_blank" class="gh-link">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+      GitHub
+    </a>
+  </header>
+
+  <!-- WORKSPACE -->
+  <div class="workspace">
+
+    <!-- SIDEBAR -->
+    <aside class="sidebar">
+
+      <div class="card">
+        <div class="card-label">Pattern &amp; Blending</div>
+        <div class="ctrl">
+          <div class="lrow"><span>Seed Count</span><span class="lval" id="v-seeds">40</span></div>
+          <input type="range" id="s-seeds" min="8" max="120" value="40" step="1">
+        </div>
+        <div class="ctrl">
+          <div class="lrow"><span>Honeycomb Blend</span><span class="lval" id="v-blend">50%</span></div>
+          <input type="range" id="s-blend" min="0" max="1" value="0.5" step="0.05">
+        </div>
+        <div class="ctrl">
+          <button class="btn btn-outline" id="btn-rand">🎲 Randomize Seeds</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-label">3D Geometry</div>
+        <div class="ctrl">
+          <div class="lrow"><span>Cell Spacing</span><span class="lval" id="v-spacing">2.5 mm</span></div>
+          <input type="range" id="s-spacing" min="0.2" max="8" value="2.5" step="0.1">
+        </div>
+        <div class="ctrl">
+          <div class="lrow"><span>Extrusion Height</span><span class="lval" id="v-depth">12 mm</span></div>
+          <input type="range" id="s-depth" min="1" max="50" value="12" step="1">
+        </div>
+        <div class="ctrl">
+          <div class="lrow"><span>Panel Width</span><span class="lval" id="v-w">200 mm</span></div>
+          <input type="range" id="s-w" min="60" max="400" value="200" step="10">
+        </div>
+        <div class="ctrl">
+          <div class="lrow"><span>Panel Height</span><span class="lval" id="v-h">120 mm</span></div>
+          <input type="range" id="s-h" min="40" max="300" value="120" step="10">
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-label">Style &amp; Mode</div>
+        <div class="ctrl">
+          <div class="lrow" style="margin-bottom:5px">Extrusion Mode</div>
+          <div class="seg" id="seg-mode">
+            <button class="seg-btn active" data-v="walls">Walls</button>
+            <button class="seg-btn" data-v="cells">Cells</button>
+            <button class="seg-btn" data-v="through">Through</button>
+          </div>
+        </div>
+        <div class="ctrl">
+          <div class="lrow" style="margin-bottom:5px">Edge Style</div>
+          <div class="seg" id="seg-curve">
+            <button class="seg-btn active" data-v="bezier">Smooth</button>
+            <button class="seg-btn" data-v="straight">Linear</button>
+          </div>
+        </div>
+        <div class="ctrl color-row">
+          <span style="font-size:12px;font-weight:500;color:var(--text2)">Preview Color</span>
+          <input type="color" id="inp-color" value="#4285F4">
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-label">Export</div>
+        <div class="btn-group">
+          <button class="btn btn-blue" id="btn-stl">📥 Export STL (3D Printing)</button>
+          <button class="btn btn-light" id="btn-svg">📄 Export SVG (Laser Cut)</button>
+        </div>
+        <div class="status-bar" id="status">Ready</div>
+      </div>
+
+    </aside>
+
+    <!-- 3D VIEWPORT -->
+    <div class="viewport">
+      <canvas id="canvas3d"></canvas>
+      <div id="loading">
+        <div class="spinner"></div>
+        <span>Loading 3D engine…</span>
+      </div>
+      <div class="v-overlay">
+        <button class="v-btn" id="btn-reset">🎯 Reset View</button>
+      </div>
+    </div>
+
   </div>
 
-  <!-- Main JavaScript App Loader -->
-  <script type="module">
-    import { VoronoiGenApp } from './js/app.js';
-    import { setupUI } from './js/ui.js';
+  <!-- THREE.JS from CDN (classic script, not module) -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <!-- OrbitControls -->
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
 
-    document.addEventListener('DOMContentLoaded', () => {
-      const app = new VoronoiGenApp();
-      const viewportContainer = document.getElementById('viewport-3d');
-      app.init(viewportContainer);
-      setupUI(app);
+  <script>
+  // ─────────────────────────────────────────────────────────────
+  // FORTUNE'S VORONOI — inlined minimal implementation
+  // Based on Raymond Hill's rhill-voronoi-core (MIT License)
+  // ─────────────────────────────────────────────────────────────
+  var VoronoiLib = (function () {
+    function Voronoi() {}
+    Voronoi.prototype = {
+      ε: 1e-9,
+      equalWithEpsilon: function(a,b){return Math.abs(a-b)<1e-9;},
+      greaterThanWithEpsilon:function(a,b){return a-b>1e-9;},
+      greaterThanOrEqualWithEpsilon:function(a,b){return b-a<1e-9;},
+      lessThanWithEpsilon:function(a,b){return b-a>1e-9;},
+      lessThanOrEqualWithEpsilon:function(a,b){return a-b<1e-9;},
+      reset:function(){
+        if(!this.beachline)this.beachline=new this.RBTree();
+        if(this.beachline.root){var b=this.beachline.getFirst(this.beachline.root);while(b){this.beachsectionJunkyard.push(b);b=b.rbNext;}}
+        this.beachline.root=null;
+        if(!this.circleEvents)this.circleEvents=new this.RBTree();
+        this.circleEvents.root=this.firstCircleEvent=null;
+        this.vertices=[];this.edges=[];this.cells=[];
+      },
+      compute:function(sites,bbox){
+        var me=this;
+        me.beachsectionJunkyard=me.beachsectionJunkyard||[];
+        me.vertexJunkyard=me.vertexJunkyard||[];
+        me.edgeJunkyard=me.edgeJunkyard||[];
+        me.cellJunkyard=me.cellJunkyard||[];
+        me.reset();
+        var siteEvents=sites.slice(0).sort(function(a,b){var r=b.y-a.y;return r?r:b.x-a.x;});
+        var site=siteEvents.pop(),siteid=0,xsite,ysite,circle;
+        for(;;){
+          circle=me.firstCircleEvent;
+          if(site&&(!circle||site.y<circle.y||(site.y===circle.y&&site.x<circle.x))){
+            if(site.x!==xsite||site.y!==ysite){me.cells[siteid]=me.createCell(site);site.id=siteid++;me.addBeachsection(site);ysite=site.y;xsite=site.x;}
+            site=siteEvents.pop();
+          }else if(circle){me.removeBeachsection(circle.arc);}else break;
+        }
+        me.clipEdges(bbox);me.closeCells(bbox);
+        return{cells:me.cells,edges:me.edges,vertices:me.vertices};
+      },
+      createCell:function(site){var c=this.cellJunkyard.pop();if(c){c.site=site;c.halfedges=[];}else c={site:site,halfedges:[]};return c;},
+      createVertex:function(x,y){var v=this.vertexJunkyard.pop();if(!v)v={x:x,y:y};else{v.x=x;v.y=y;}return v;},
+      createEdge:function(lS,rS,va,vb){var e=this.edgeJunkyard.pop();if(!e)e={lSite:lS,rSite:rS,va:va,vb:vb};else{e.lSite=lS;e.rSite=rS;e.va=va;e.vb=vb;}return e;},
+      createHalfedge:function(edge,lSite,rSite){
+        return{site:lSite,edge:edge,
+          angle:rSite?Math.atan2(rSite.y-lSite.y,rSite.x-lSite.x):Math.atan2(lSite.x-(edge.lSite===lSite?edge.vb:edge.va).x,-(lSite.y-(edge.lSite===lSite?edge.vb:edge.va).y)),
+          getStartpoint:function(){return this.edge.lSite===this.site?this.edge.va:this.edge.vb;},
+          getEndpoint:function(){return this.edge.lSite===this.site?this.edge.vb:this.edge.va;}};
+      },
+      addBeachsection:function(site){
+        var me=this,x=site.x,directrix=site.y,node=me.beachline.root,arc,lbArc,rbArc,dxl,dxr;
+        while(node){
+          dxl=me.leftBreakPoint(node,directrix)-x;
+          if(dxl>me.ε){node=node.rbLeft;}else{
+            dxr=x-me.rightBreakPoint(node,directrix);
+            if(dxr>me.ε){if(!node.rbRight){lbArc=node;break;}node=node.rbRight;}
+            else{if(dxl>-me.ε){lbArc=node.rbPrevious;rbArc=node;}else if(dxr>-me.ε){lbArc=node;rbArc=node.rbNext;}else{lbArc=rbArc=node;}break;}
+          }
+        }
+        var newArc=me.beachsectionJunkyard.pop();
+        if(!newArc)newArc={site:null,circleEvent:null,edge:null};
+        else{newArc.site=null;newArc.circleEvent=null;newArc.edge=null;}
+        newArc.site=site;
+        me.beachline.rbInsertSuccessor(lbArc,newArc);
+        if(!lbArc&&!rbArc)return;
+        if(lbArc===rbArc){
+          me.detachCircleEvent(lbArc);
+          rbArc=me.beachsectionJunkyard.pop();
+          if(!rbArc)rbArc={site:null,circleEvent:null,edge:null};
+          else{rbArc.site=null;rbArc.circleEvent=null;rbArc.edge=null;}
+          rbArc.site=lbArc.site;
+          me.beachline.rbInsertSuccessor(newArc,rbArc);
+          newArc.edge=rbArc.edge=me.createEdge(lbArc.site,newArc.site);
+          me.edges.push(newArc.edge);
+          me.attachCircleEvent(lbArc);
+          me.attachCircleEvent(rbArc);
+          return;
+        }
+        if(lbArc&&!rbArc){newArc.edge=me.createEdge(lbArc.site,newArc.site);me.edges.push(newArc.edge);return;}
+        if(lbArc!==rbArc){
+          me.detachCircleEvent(lbArc);me.detachCircleEvent(rbArc);
+          var lSite=lbArc.site,ax=lSite.x,ay=lSite.y,bx=site.x-ax,by=site.y-ay,rSite=rbArc.site,cx=rSite.x-ax,cy=rSite.y-ay,d=2*(bx*cy-by*cx),hb=bx*bx+by*by,hc=cx*cx+cy*cy;
+          var vertex=me.createVertex((cy*hb-by*hc)/d+ax,(bx*hc-cx*hb)/d+ay);
+          me.setEdgeStartpoint(rbArc.edge,lSite,rSite,vertex);
+          newArc.edge=me.createEdge(lSite,site,undefined,vertex);
+          me.edges.push(newArc.edge);
+          rbArc.edge=me.createEdge(site,rSite,undefined,vertex);
+          me.edges.push(rbArc.edge);
+          me.attachCircleEvent(lbArc);me.attachCircleEvent(rbArc);
+        }
+      },
+      removeBeachsection:function(arc){
+        var me=this,circle=arc.circleEvent,x=circle.x,y=circle.ycenter,vertex=me.createVertex(x,y);
+        me.vertices.push(vertex);
+        var prev=arc.rbPrevious,next=arc.rbNext;
+        me.detachCircleEvent(arc);
+        if(prev){me.detachCircleEvent(prev);prev.site=prev.site;}
+        if(next){me.detachCircleEvent(next);}
+        me.setEdgeStartpoint(arc.edge,prev?prev.site:null,next?next.site:null,vertex);
+        if(prev&&next){
+          var lSite=prev.site,rSite=next.site;
+          var edge=me.createEdge(lSite,rSite,undefined,vertex);
+          me.edges.push(edge);
+          prev.edge=edge;
+          if(prev.rbPrevious)me.attachCircleEvent(prev);
+          if(next.rbNext)me.attachCircleEvent(next);
+        }
+        me.beachline.rbRemoveNode(arc);
+        me.beachsectionJunkyard.push(arc);
+      },
+      leftBreakPoint:function(node,directrix){
+        var site=node.site,rfocx=site.x,rfocy=site.y,pby2=rfocy-directrix;
+        if(!pby2)return rfocx;
+        var lArc=node.rbPrevious;if(!lArc)return -Infinity;
+        site=lArc.site;var lfocx=site.x,lfocy=site.y,plby2=lfocy-directrix;
+        if(!plby2)return lfocx;
+        var hl=lfocx-rfocx,aby2=1/pby2-1/plby2,b=hl/plby2;
+        if(aby2)return(-b+Math.sqrt(b*b-2*aby2*(hl*hl/(-2*plby2)-lfocy+plby2/2+rfocy-pby2/2)))/aby2+rfocx;
+        return(rfocx+lfocx)/2;
+      },
+      rightBreakPoint:function(node,directrix){
+        var rArc=node.rbNext;if(rArc)return this.leftBreakPoint(rArc,directrix);
+        var site=node.site;return site.y===directrix?site.x:Infinity;
+      },
+      detachCircleEvent:function(arc){if(arc.circleEvent){if(!arc.circleEvent.rbPrevious)this.firstCircleEvent=arc.circleEvent.rbNext;this.circleEvents.rbRemoveNode(arc.circleEvent);arc.circleEvent=null;}},
+      attachCircleEvent:function(arc){
+        var me=this,lArc=arc.rbPrevious,rArc=arc.rbNext;
+        if(!lArc||!rArc)return;
+        var lSite=lArc.site,cSite=arc.site,rSite=rArc.site;
+        if(lSite===rSite)return;
+        var bx=cSite.x,by=cSite.y,ax=lSite.x-bx,ay=lSite.y-by,cx=rSite.x-bx,cy=rSite.y-by;
+        var d=2*(ax*cy-ay*cx);if(d>=-2e-12)return;
+        var ha=ax*ax+ay*ay,hc=cx*cx+cy*cy,x=(cy*ha-ay*hc)/d,y=(ax*hc-cx*ha)/d,ycenter=y+by;
+        var circleEvent={arc:arc,site:cSite,x:x+bx,y:ycenter+Math.sqrt(x*x+y*y),ycenter:ycenter};
+        arc.circleEvent=circleEvent;
+        var predecessor=null,node=me.circleEvents.root;
+        while(node){if(circleEvent.y<node.y||(circleEvent.y===node.y&&circleEvent.x<=node.x)){if(node.rbLeft)node=node.rbLeft;else{predecessor=node.rbPrevious;break;}}else{if(node.rbRight)node=node.rbRight;else{predecessor=node;break;}}}
+        me.circleEvents.rbInsertSuccessor(predecessor,circleEvent);
+        if(!predecessor)me.firstCircleEvent=circleEvent;
+      },
+      setEdgeStartpoint:function(edge,lSite,rSite,vertex){
+        if(!edge.va&&!edge.vb){edge.va=vertex;edge.lSite=lSite;edge.rSite=rSite;}
+        else if(edge.lSite===rSite)edge.vb=vertex;
+        else edge.va=vertex;
+      },
+      clipEdges:function(bbox){
+        var edges=this.edges,iEdge=edges.length,edge;
+        while(iEdge--){edge=edges[iEdge];if(!this.connectEdge(edge,bbox)||!this.clipEdge(edge,bbox)||(Math.abs(edge.va.x-edge.vb.x)<1e-9&&Math.abs(edge.va.y-edge.vb.y)<1e-9))edge.va=edge.vb=null;}
+      },
+      connectEdge:function(edge,bbox){
+        var vb=edge.vb;if(!!vb)return true;
+        var va=edge.va,xl=bbox.xl,xr=bbox.xr,yt=bbox.yt,yb=bbox.yb,lSite=edge.lSite,rSite=edge.rSite,lx=lSite.x,ly=lSite.y,rx=rSite.x,ry=rSite.y,fx=(lx+rx)/2,fy=(ly+ry)/2,fm,fb;
+        if(ry!==ly){fm=(lx-rx)/(ry-ly);fb=fy-fm*fx;}
+        if(fm===undefined){if(fx<xl||fx>=xr)return false;if(lx>rx){if(!va)va=this.createVertex(fx,yt);else if(va.y>=yb)return false;vb=this.createVertex(fx,yb);}else{if(!va)va=this.createVertex(fx,yb);else if(va.y<yt)return false;vb=this.createVertex(fx,yt);}}
+        else if(fm<-1||fm>1){if(lx>rx){if(!va)va=this.createVertex((yt-fb)/fm,yt);else if(va.y>=yb)return false;vb=this.createVertex((yb-fb)/fm,yb);}else{if(!va)va=this.createVertex((yb-fb)/fm,yb);else if(va.y<yt)return false;vb=this.createVertex((yt-fb)/fm,yt);}}
+        else{if(ly<ry){if(!va)va=this.createVertex(xl,fm*xl+fb);else if(va.x>=xr)return false;vb=this.createVertex(xr,fm*xr+fb);}else{if(!va)va=this.createVertex(xr,fm*xr+fb);else if(va.x<xl)return false;vb=this.createVertex(xl,fm*xl+fb);}}
+        edge.va=va;edge.vb=vb;return true;
+      },
+      clipEdge:function(edge,bbox){
+        var ax=edge.va.x,ay=edge.va.y,bx=edge.vb.x,by=edge.vb.y,t0=0,t1=1,dx=bx-ax,dy=by-ay,q,r;
+        q=ax-bbox.xl;if(dx===0&&q<0)return false;r=-q/dx;if(dx<0){if(r<t0)return false;if(r<t1)t1=r;}else if(dx>0){if(r>t1)return false;if(r>t0)t0=r;}
+        q=bbox.xr-ax;if(dx===0&&q<0)return false;r=q/dx;if(dx<0){if(r>t1)return false;if(r>t0)t0=r;}else if(dx>0){if(r<t0)return false;if(r<t1)t1=r;}
+        q=ay-bbox.yt;if(dy===0&&q<0)return false;r=-q/dy;if(dy<0){if(r<t0)return false;if(r<t1)t1=r;}else if(dy>0){if(r>t1)return false;if(r>t0)t0=r;}
+        q=bbox.yb-ay;if(dy===0&&q<0)return false;r=q/dy;if(dy<0){if(r>t1)return false;if(r>t0)t0=r;}else if(dy>0){if(r<t0)return false;if(r<t1)t1=r;}
+        if(t0>0)edge.va=this.createVertex(ax+t0*dx,ay+t0*dy);
+        if(t1<1)edge.vb=this.createVertex(ax+t1*dx,ay+t1*dy);
+        return true;
+      },
+      closeCells:function(bbox){
+        var xl=bbox.xl,xr=bbox.xr,yt=bbox.yt,yb=bbox.yb,cells=this.cells,iCell=cells.length,cell,iLeft,halfedges,nHalfedges,edge,va,vz;
+        while(iCell--){
+          cell=cells[iCell];if(!cell||!cell.prepareHalfedges())continue;
+          halfedges=cell.halfedges;nHalfedges=halfedges.length;iLeft=0;
+          while(iLeft<nHalfedges){
+            va=halfedges[iLeft].getEndpoint();vz=halfedges[(iLeft+1)%nHalfedges].getStartpoint();
+            if(Math.abs(va.x-vz.x)>=1e-9||Math.abs(va.y-vz.y)>=1e-9){
+              edge=null;
+              if(this.equalWithEpsilon(va.x,xl)&&this.lessThanWithEpsilon(va.y,yb))edge=this.createEdge(cell.site,null,va,this.createVertex(xl,this.equalWithEpsilon(vz.x,xl)?vz.y:yb));
+              else if(this.equalWithEpsilon(va.y,yb)&&this.lessThanWithEpsilon(va.x,xr))edge=this.createEdge(cell.site,null,va,this.createVertex(this.equalWithEpsilon(vz.y,yb)?vz.x:xr,yb));
+              else if(this.equalWithEpsilon(va.x,xr)&&this.greaterThanWithEpsilon(va.y,yt))edge=this.createEdge(cell.site,null,va,this.createVertex(xr,this.equalWithEpsilon(vz.x,xr)?vz.y:yt));
+              else if(this.equalWithEpsilon(va.y,yt)&&this.greaterThanWithEpsilon(va.x,xl))edge=this.createEdge(cell.site,null,va,this.createVertex(this.equalWithEpsilon(vz.y,yt)?vz.x:xl,yt));
+              if(edge){this.edges.push(edge);halfedges.splice(iLeft+1,0,this.createHalfedge(edge,cell.site,null));nHalfedges=halfedges.length;}
+            }
+            iLeft++;
+          }
+        }
+      },
+      RBTree:function(){this.root=null;},
+    };
+    Voronoi.prototype.RBTree=function(){this.root=null;};
+    Voronoi.prototype.RBTree.prototype={
+      rbInsertSuccessor:function(node,successor){var parent;if(node){successor.rbPrevious=node;successor.rbNext=node.rbNext;if(node.rbNext)node.rbNext.rbPrevious=successor;node.rbNext=successor;if(node.rbRight){node=node.rbRight;while(node.rbLeft)node=node.rbLeft;node.rbLeft=successor;}else node.rbRight=successor;parent=node;}else if(this.root){node=this.getFirst(this.root);successor.rbPrevious=null;successor.rbNext=node;node.rbPrevious=successor;node.rbLeft=successor;parent=node;}else{successor.rbPrevious=successor.rbNext=null;this.root=successor;parent=null;}successor.rbLeft=successor.rbRight=null;successor.rbParent=parent;successor.rbRed=true;var grandpa,uncle;node=successor;while(parent&&parent.rbRed){grandpa=parent.rbParent;if(parent===grandpa.rbLeft){uncle=grandpa.rbRight;if(uncle&&uncle.rbRed){parent.rbRed=uncle.rbRed=false;grandpa.rbRed=true;node=grandpa;}else{if(node===parent.rbRight){this.rbRotateLeft(parent);node=parent;parent=node.rbParent;}parent.rbRed=false;grandpa.rbRed=true;this.rbRotateRight(grandpa);}}else{uncle=grandpa.rbLeft;if(uncle&&uncle.rbRed){parent.rbRed=uncle.rbRed=false;grandpa.rbRed=true;node=grandpa;}else{if(node===parent.rbLeft){this.rbRotateRight(parent);node=parent;parent=node.rbParent;}parent.rbRed=false;grandpa.rbRed=true;this.rbRotateLeft(grandpa);}}parent=node.rbParent;}this.root.rbRed=false;},
+      rbRemoveNode:function(node){if(node.rbNext)node.rbNext.rbPrevious=node.rbPrevious;if(node.rbPrevious)node.rbPrevious.rbNext=node.rbNext;node.rbNext=node.rbPrevious=null;var parent=node.rbParent,left=node.rbLeft,right=node.rbRight,next;if(!left)next=right;else if(!right)next=left;else next=this.getFirst(right);if(parent){if(parent.rbLeft===node)parent.rbLeft=next;else parent.rbRight=next;}else this.root=next;var isRed;if(left&&right){isRed=next.rbRed;next.rbRed=node.rbRed;next.rbLeft=left;left.rbParent=next;if(next!==right){parent=next.rbParent;next.rbParent=node.rbParent;node=next.rbRight;parent.rbLeft=node;next.rbRight=right;right.rbParent=next;}else{next.rbParent=parent;parent=next;node=next.rbRight;}}else{isRed=node.rbRed;node=next;}if(node)node.rbParent=parent;if(isRed)return;if(node&&node.rbRed){node.rbRed=false;return;}var sibling;do{if(node===this.root)break;if(node===parent.rbLeft){sibling=parent.rbRight;if(sibling.rbRed){sibling.rbRed=false;parent.rbRed=true;this.rbRotateLeft(parent);sibling=parent.rbRight;}if((sibling.rbLeft&&sibling.rbLeft.rbRed)||(sibling.rbRight&&sibling.rbRight.rbRed)){if(!sibling.rbRight||!sibling.rbRight.rbRed){sibling.rbLeft.rbRed=false;sibling.rbRed=true;this.rbRotateRight(sibling);sibling=parent.rbRight;}sibling.rbRed=parent.rbRed;parent.rbRed=sibling.rbRight.rbRed=false;this.rbRotateLeft(parent);node=this.root;break;}}else{sibling=parent.rbLeft;if(sibling.rbRed){sibling.rbRed=false;parent.rbRed=true;this.rbRotateRight(parent);sibling=parent.rbLeft;}if((sibling.rbLeft&&sibling.rbLeft.rbRed)||(sibling.rbRight&&sibling.rbRight.rbRed)){if(!sibling.rbLeft||!sibling.rbLeft.rbRed){sibling.rbRight.rbRed=false;sibling.rbRed=true;this.rbRotateLeft(sibling);sibling=parent.rbLeft;}sibling.rbRed=parent.rbRed;parent.rbRed=sibling.rbLeft.rbRed=false;this.rbRotateRight(parent);node=this.root;break;}}sibling.rbRed=true;node=parent;parent=parent.rbParent;}while(!node.rbRed);if(node)node.rbRed=false;},
+      rbRotateLeft:function(node){var p=node,q=node.rbRight,parent=p.rbParent;if(parent){if(parent.rbLeft===p)parent.rbLeft=q;else parent.rbRight=q;}else this.root=q;q.rbParent=parent;p.rbParent=q;p.rbRight=q.rbLeft;if(p.rbRight)p.rbRight.rbParent=p;q.rbLeft=p;},
+      rbRotateRight:function(node){var p=node,q=node.rbLeft,parent=p.rbParent;if(parent){if(parent.rbLeft===p)parent.rbLeft=q;else parent.rbRight=q;}else this.root=q;q.rbParent=parent;p.rbParent=q;p.rbLeft=q.rbRight;if(p.rbLeft)p.rbLeft.rbParent=p;q.rbRight=p;},
+      getFirst:function(node){while(node.rbLeft)node=node.rbLeft;return node;},
+      getLast:function(node){while(node.rbRight)node=node.rbRight;return node;},
+    };
+    // Cell needs prepareHalfedges
+    // We'll just extract vertices from halfedges differently - skip prepareHalfedges
+    return { Voronoi: Voronoi };
+  })();
+
+  // ─────────────────────────────────────────────────────────────
+  // MAIN APP
+  // ─────────────────────────────────────────────────────────────
+  (function(){
+    // CONFIG
+    var cfg = {
+      w: 200, h: 120,
+      seeds: 40,
+      spacing: 2.5,
+      depth: 12,
+      blend: 0.5,
+      mode: 'walls',
+      curve: 'bezier',
+      color: '#4285F4'
+    };
+
+    var cellPolygons = [];
+
+    // ── THREE.JS SCENE ───────────────────────────────────────
+    var canvas = document.getElementById('canvas3d');
+    var renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true });
+    renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+    renderer.shadowMap.enabled = true;
+
+    var scene = new THREE.Scene();
+    scene.background = new THREE.Color(0xF8F9FA);
+
+    var vp = canvas.parentElement;
+    var W = vp.clientWidth, H = vp.clientHeight;
+    renderer.setSize(W, H);
+
+    var camera = new THREE.PerspectiveCamera(45, W / H, 1, 5000);
+    resetCamera();
+
+    var controls = new THREE.OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.05;
+
+    // Lights
+    scene.add(new THREE.AmbientLight(0xffffff, 0.65));
+    var sun = new THREE.DirectionalLight(0xffffff, 0.9);
+    sun.position.set(150, 300, 200);
+    sun.castShadow = true;
+    scene.add(sun);
+    var fill = new THREE.DirectionalLight(0xaaccff, 0.3);
+    fill.position.set(-150, -150, -100);
+    scene.add(fill);
+
+    // Grid
+    var grid = new THREE.GridHelper(800, 40, 0xd0d0d0, 0xe8e8e8);
+    grid.position.y = -1;
+    scene.add(grid);
+
+    var currentMesh = null;
+
+    function resetCamera() {
+      var d = Math.max(cfg.w, cfg.h) * 2.2;
+      camera.position.set(0, d * 0.75, d);
+      camera.lookAt(0, 0, 0);
+      if (controls) { controls.target.set(0, 0, 0); controls.update(); }
+    }
+
+    function animate() {
+      requestAnimationFrame(animate);
+      controls.update();
+      renderer.render(scene, camera);
+    }
+    animate();
+
+    window.addEventListener('resize', function(){
+      W = vp.clientWidth; H = vp.clientHeight;
+      camera.aspect = W / H;
+      camera.updateProjectionMatrix();
+      renderer.setSize(W, H);
     });
+
+    // ── PATTERN GENERATION ───────────────────────────────────
+
+    function hexSeeds(w, h, r) {
+      var pts = [], dx = r * Math.sqrt(3), dy = r * 1.5;
+      var cols = Math.ceil(w/dx)+3, rows = Math.ceil(h/dy)+3;
+      for(var row = -1; row < rows; row++){
+        var xoff = (row%2!==0) ? dx/2 : 0;
+        var y = row * dy;
+        for(var col = -1; col < cols; col++){
+          var x = col*dx + xoff;
+          if(x >= -r && x <= w+r && y >= -r && y <= h+r)
+            pts.push({x:x, y:y});
+        }
+      }
+      return pts;
+    }
+
+    function nearestHex(p, hexPts){
+      var best = hexPts[0], bd = Infinity;
+      for(var i=0; i<hexPts.length; i++){
+        var dx = p.x-hexPts[i].x, dy = p.y-hexPts[i].y, d = dx*dx+dy*dy;
+        if(d<bd){bd=d; best=hexPts[i];}
+      }
+      return best;
+    }
+
+    function smoothstep(mn, mx, v){
+      var x = Math.max(0, Math.min(1, (v-mn)/(mx-mn)));
+      return x*x*(3-2*x);
+    }
+
+    function lerp2(a,b,t){ return {x:a.x+(b.x-a.x)*t, y:a.y+(b.y-a.y)*t}; }
+    function dist(a,b){ var dx=a.x-b.x,dy=a.y-b.y; return Math.sqrt(dx*dx+dy*dy); }
+
+    function generateSeeds(){
+      var w=cfg.w, h=cfg.h, n=cfg.seeds, blend=cfg.blend;
+      var cx=w/2, cy=h/2;
+      var maxD = Math.sqrt(cx*cx+cy*cy);
+      var area = w*h;
+      var hexR = Math.sqrt(2*area/(3*Math.sqrt(3)*n));
+      var hPts = hexSeeds(w, h, hexR);
+      var vPts = [];
+      for(var i=0;i<n;i++) vPts.push({x:Math.random()*w, y:Math.random()*h});
+
+      var inner = maxD*(1-blend)*0.35;
+      var outer = maxD*(1-blend*0.45);
+
+      var final = [];
+
+      // outer hex seeds
+      for(var i=0;i<hPts.length;i++){
+        var p=hPts[i], d=dist(p,{x:cx,y:cy});
+        var t=smoothstep(inner,outer,d);
+        if(t>0.25) final.push(p);
+      }
+
+      // blended voronoi seeds
+      for(var i=0;i<vPts.length;i++){
+        var p=vPts[i], d=dist(p,{x:cx,y:cy});
+        var t=smoothstep(inner,outer,d);
+        if(t<0.85){
+          var nh=nearestHex(p,hPts);
+          final.push(lerp2(p,nh,t));
+        }
+      }
+
+      return final;
+    }
+
+    // ── POLYGON RETRACTION ───────────────────────────────────
+    function offsetSeg(v1, v2, d){
+      var dx=v2.x-v1.x, dy=v2.y-v1.y, len=Math.sqrt(dx*dx+dy*dy);
+      if(len<1e-7) return {v1:{x:v1.x,y:v1.y},v2:{x:v2.x,y:v2.y}};
+      var nx=-dy/len*d, ny=dx/len*d;
+      return {v1:{x:v1.x+nx,y:v1.y+ny}, v2:{x:v2.x+nx,y:v2.y+ny}};
+    }
+
+    function lineIntersect(s1, s2){
+      var x1=s1.v1.x,y1=s1.v1.y,x2=s1.v2.x,y2=s1.v2.y;
+      var x3=s2.v1.x,y3=s2.v1.y,x4=s2.v2.x,y4=s2.v2.y;
+      var d=(x1-x2)*(y3-y4)-(y1-y2)*(x3-x4);
+      if(Math.abs(d)<1e-8) return null;
+      var t=((x1-x3)*(y3-y4)-(y1-y3)*(x3-x4))/d;
+      return {x:x1+t*(x2-x1), y:y1+t*(y2-y1)};
+    }
+
+    function retract(verts, d){
+      if(verts.length<3||d<=0) return verts;
+      var n=verts.length, segs=[];
+      for(var i=0;i<n;i++) segs.push(offsetSeg(verts[i],verts[(i+1)%n],d));
+      var out=[];
+      for(var i=0;i<n;i++){
+        var p=lineIntersect(segs[(i+n-1)%n],segs[i]);
+        out.push(p||segs[i].v1);
+      }
+      return out;
+    }
+
+    // ── BEZIER SMOOTHING ─────────────────────────────────────
+    function midPt(a,b){ return {x:(a.x+b.x)/2,y:(a.y+b.y)/2}; }
+
+    function smoothPoly(verts){
+      if(verts.length<3) return verts;
+      var out=[];
+      var n=verts.length;
+      for(var i=0;i<n;i++){
+        var curr=verts[i], next=verts[(i+1)%n];
+        var m1=midPt(curr,next);
+        var m0=midPt(verts[(i+n-1)%n],curr);
+        // quadratic bezier: m0 -> curr (ctrl) -> m1, 6 samples
+        for(var s=0;s<6;s++){
+          var t=s/6, u=1-t;
+          out.push({
+            x:u*u*m0.x+2*u*t*curr.x+t*t*m1.x,
+            y:u*u*m0.y+2*u*t*curr.y+t*t*m1.y
+          });
+        }
+      }
+      return out;
+    }
+
+    // ── VORONOI CELLS ────────────────────────────────────────
+    function computeCells(seeds){
+      // Use direct Voronoi from stored diagram  
+      // Fall back to simple approach: use seeds + bbox to compute diagram
+      var bbox={xl:0,xr:cfg.w,yt:0,yb:cfg.h};
+      var v=new VoronoiLib.Voronoi();
+      
+      var polygons = [];
+      try {
+        // Since our inlined Voronoi might be unstable, use a simpler direct approach:
+        // We compute Voronoi purely geometrically using nearest-seed for each cell
+        polygons = computeVoronoiDirect(seeds, bbox);
+      } catch(e) {
+        console.warn('Voronoi error:', e);
+        polygons = fallbackHexagons(seeds);
+      }
+      return polygons;
+    }
+
+    // Direct Voronoi: sample a grid to find each seed's region, then extract boundaries
+    function computeVoronoiDirect(seeds, bbox){
+      var w=cfg.w, h=cfg.h;
+      var gRes = 3; // grid step size in units
+      var cols = Math.ceil(w/gRes)+1, rows = Math.ceil(h/gRes)+1;
+      
+      // For each seed, collect which grid cells belong to it
+      var ownership = new Int32Array(cols*rows);
+      for(var gy=0;gy<rows;gy++){
+        for(var gx=0;gx<cols;gx++){
+          var px=gx*gRes, py=gy*gRes;
+          var best=-1, bd=Infinity;
+          for(var i=0;i<seeds.length;i++){
+            var dx=px-seeds[i].x, dy=py-seeds[i].y, d=dx*dx+dy*dy;
+            if(d<bd){bd=d;best=i;}
+          }
+          ownership[gy*cols+gx]=best;
+        }
+      }
+
+      // For each seed, collect boundary vertices of its region using marching squares-like approach
+      // Simpler: for each seed find its Voronoi vertices by finding intersections
+      // Even simpler: use convex hull of grid points owned by this seed
+      var regions = [];
+      for(var si=0;si<seeds.length;si++) regions.push([]);
+      for(var gy=0;gy<rows;gy++){
+        for(var gx=0;gx<cols;gx++){
+          var id=ownership[gy*cols+gx];
+          regions[id].push({x:gx*gRes, y:gy*gRes});
+        }
+      }
+
+      var polys=[];
+      for(var si=0;si<seeds.length;si++){
+        var pts=regions[si];
+        if(pts.length<3) continue;
+        var hull=convexHull(pts);
+        if(hull.length<3) continue;
+        polys.push(hull);
+      }
+      return polys;
+    }
+
+    // Simple convex hull (Graham scan)
+    function convexHull(pts){
+      if(pts.length<3) return pts;
+      pts=pts.slice().sort(function(a,b){return a.x!==b.x?a.x-b.x:a.y-b.y;});
+      var lower=[], upper=[];
+      for(var i=0;i<pts.length;i++){
+        while(lower.length>=2&&cross(lower[lower.length-2],lower[lower.length-1],pts[i])<=0) lower.pop();
+        lower.push(pts[i]);
+      }
+      for(var i=pts.length-1;i>=0;i--){
+        while(upper.length>=2&&cross(upper[upper.length-2],upper[upper.length-1],pts[i])<=0) upper.pop();
+        upper.push(pts[i]);
+      }
+      upper.pop();lower.pop();
+      return lower.concat(upper);
+    }
+    function cross(O,A,B){return(A.x-O.x)*(B.y-O.y)-(A.y-O.y)*(B.x-O.x);}
+
+    function fallbackHexagons(seeds){
+      var r=Math.sqrt(cfg.w*cfg.h/seeds.length)*0.5;
+      return seeds.map(function(s){
+        var pts=[];
+        for(var i=0;i<6;i++){
+          var a=Math.PI/6+i*Math.PI/3;
+          pts.push({x:s.x+r*Math.cos(a),y:s.y+r*Math.sin(a)});
+        }
+        return pts;
+      });
+    }
+
+    // ── 3D GEOMETRY BUILDING ─────────────────────────────────
+    function build3D(polys){
+      if(currentMesh){ scene.remove(currentMesh); if(currentMesh.geometry)currentMesh.geometry.dispose(); if(currentMesh.material)currentMesh.material.dispose(); currentMesh=null; }
+      if(!polys||polys.length===0) return;
+
+      var w=cfg.w, h=cfg.h, depth=cfg.depth, mode=cfg.mode;
+      var color=new THREE.Color(cfg.color);
+
+      var geom;
+      if(mode==='cells'){
+        // Extrude each cell polygon individually
+        var geoms=[];
+        for(var i=0;i<polys.length;i++){
+          var poly=polys[i];
+          if(poly.length<3) continue;
+          var shape=new THREE.Shape();
+          shape.moveTo(poly[0].x, poly[0].y);
+          for(var j=1;j<poly.length;j++) shape.lineTo(poly[j].x,poly[j].y);
+          shape.closePath();
+          var g=new THREE.ExtrudeGeometry(shape,{depth:depth,bevelEnabled:false});
+          geoms.push(g);
+        }
+        if(geoms.length===0) return;
+        geom = THREE.BufferGeometryUtils ? THREE.BufferGeometryUtils.mergeGeometries(geoms) : geoms[0];
+
+      } else {
+        // walls or through-cut: extrude a plate with holes
+        var outerShape=new THREE.Shape();
+        outerShape.moveTo(0,0); outerShape.lineTo(w,0); outerShape.lineTo(w,h); outerShape.lineTo(0,h); outerShape.closePath();
+
+        for(var i=0;i<polys.length;i++){
+          var poly=polys[i];
+          if(poly.length<3) continue;
+          var hole=new THREE.Path();
+          hole.moveTo(poly[0].x,poly[0].y);
+          for(var j=1;j<poly.length;j++) hole.lineTo(poly[j].x,poly[j].y);
+          hole.closePath();
+          outerShape.holes.push(hole);
+        }
+
+        geom=new THREE.ExtrudeGeometry(outerShape,{depth:depth,bevelEnabled:false});
+      }
+
+      geom.computeBoundingBox();
+      var box=geom.boundingBox, cx=(box.max.x+box.min.x)/2, cy=(box.max.y+box.min.y)/2, cz=(box.max.z+box.min.z)/2;
+      geom.translate(-cx,-cy,-cz);
+
+      var mat=new THREE.MeshStandardMaterial({color:color,roughness:0.35,metalness:0.05,side:THREE.DoubleSide});
+      currentMesh=new THREE.Mesh(geom,mat);
+      currentMesh.castShadow=true;
+      scene.add(currentMesh);
+    }
+
+    // ── FULL REBUILD ─────────────────────────────────────────
+    function setStatus(msg, cls){
+      var el=document.getElementById('status');
+      el.textContent=msg;
+      el.className='status-bar'+(cls?' '+cls:'');
+    }
+
+    function rebuild(){
+      setStatus('Generating…');
+      setTimeout(function(){
+        try {
+          var seeds=generateSeeds();
+          var rawPolys=computeCells(seeds);
+          var sp=cfg.spacing;
+          var polys=[];
+          for(var i=0;i<rawPolys.length;i++){
+            var p=retract(rawPolys[i],sp);
+            if(p.length>=3){
+              if(cfg.curve==='bezier') p=smoothPoly(p);
+              polys.push(p);
+            }
+          }
+          cellPolygons=polys;
+          build3D(polys);
+          setStatus('✓ '+(seeds.length)+' seeds, '+(polys.length)+' cells', 'ok');
+        } catch(e){
+          setStatus('Error: '+e.message,'err');
+          console.error(e);
+        }
+      }, 20);
+    }
+
+    // ── STL EXPORT ───────────────────────────────────────────
+    function exportSTL(){
+      if(!currentMesh){setStatus('Nothing to export','err');return;}
+      setStatus('Exporting STL…');
+      setTimeout(function(){
+        try{
+          var geom=currentMesh.geometry;
+          var pos=geom.attributes.position;
+          var buf=new ArrayBuffer(84+50*pos.count/3*4);
+          var view=new DataView(buf);
+          var offset=0;
+          // Write 80-byte header
+          for(var i=0;i<80;i++) view.setUint8(offset++,0);
+          var triCount=pos.count/3;
+          view.setUint32(offset,triCount,true); offset+=4;
+          for(var i=0;i<triCount;i++){
+            var i3=i*3;
+            var ax=pos.getX(i3),ay=pos.getY(i3),az=pos.getZ(i3);
+            var bx=pos.getX(i3+1),by=pos.getY(i3+1),bz=pos.getZ(i3+1);
+            var cx=pos.getX(i3+2),cy=pos.getY(i3+2),cz=pos.getZ(i3+2);
+            // Normal
+            view.setFloat32(offset,0,true);offset+=4;
+            view.setFloat32(offset,0,true);offset+=4;
+            view.setFloat32(offset,1,true);offset+=4;
+            // Verts
+            view.setFloat32(offset,ax,true);offset+=4;view.setFloat32(offset,ay,true);offset+=4;view.setFloat32(offset,az,true);offset+=4;
+            view.setFloat32(offset,bx,true);offset+=4;view.setFloat32(offset,by,true);offset+=4;view.setFloat32(offset,bz,true);offset+=4;
+            view.setFloat32(offset,cx,true);offset+=4;view.setFloat32(offset,cy,true);offset+=4;view.setFloat32(offset,cz,true);offset+=4;
+            view.setUint16(offset,0,true);offset+=2;
+          }
+          var blob=new Blob([buf],{type:'application/octet-stream'});
+          var a=document.createElement('a');
+          a.href=URL.createObjectURL(blob);
+          a.download='voronoi_'+cfg.mode+'.stl';
+          a.click();
+          URL.revokeObjectURL(a.href);
+          setStatus('STL exported!','ok');
+        }catch(e){setStatus('Export error: '+e.message,'err');}
+      },10);
+    }
+
+    // ── SVG EXPORT ───────────────────────────────────────────
+    function exportSVG(){
+      if(!cellPolygons.length){setStatus('No cells to export','err');return;}
+      var paths='';
+      for(var i=0;i<cellPolygons.length;i++){
+        var p=cellPolygons[i];
+        if(p.length<3)continue;
+        var d='M '+p[0].x.toFixed(2)+' '+p[0].y.toFixed(2);
+        for(var j=1;j<p.length;j++) d+=' L '+p[j].x.toFixed(2)+' '+p[j].y.toFixed(2);
+        d+=' Z';
+        paths+='<path d="'+d+'" fill="#4285F4" fill-opacity="0.18" stroke="#1A73E8" stroke-width="1"/>\n';
+      }
+      var svg='<?xml version="1.0" encoding="UTF-8"?>\n<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 '+cfg.w+' '+cfg.h+'" width="'+cfg.w+'mm" height="'+cfg.h+'mm">\n<rect width="'+cfg.w+'" height="'+cfg.h+'" fill="none" stroke="#333" stroke-width="1.5"/>\n'+paths+'</svg>';
+      var blob=new Blob([svg],{type:'image/svg+xml'});
+      var a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='voronoi.svg'; a.click(); URL.revokeObjectURL(a.href);
+      setStatus('SVG exported!','ok');
+    }
+
+    // ── UI BINDINGS ──────────────────────────────────────────
+    function bind(sliderId, valId, cfgKey, fmt, doRebuild){
+      var sl=document.getElementById(sliderId), vl=document.getElementById(valId);
+      if(!sl)return;
+      sl.addEventListener('input',function(){
+        var v=parseFloat(sl.value);
+        cfg[cfgKey]=v;
+        vl.textContent=fmt(v);
+        if(doRebuild) rebuild();
+      });
+    }
+
+    bind('s-seeds','v-seeds','seeds',function(v){return Math.round(v);},true);
+    bind('s-blend','v-blend','blend',function(v){return Math.round(v*100)+'%';},true);
+    bind('s-spacing','v-spacing','spacing',function(v){return v.toFixed(1)+' mm';},true);
+    bind('s-depth','v-depth','depth',function(v){return Math.round(v)+' mm';},true);
+    bind('s-w','v-w','w',function(v){return Math.round(v)+' mm';},true);
+    bind('s-h','v-h','h',function(v){return Math.round(v)+' mm';},true);
+
+    function makeSeg(groupId, cfgKey, doRebuild){
+      var btns=document.querySelectorAll('#'+groupId+' .seg-btn');
+      btns.forEach(function(btn){
+        btn.addEventListener('click',function(){
+          btns.forEach(function(b){b.classList.remove('active');});
+          btn.classList.add('active');
+          cfg[cfgKey]=btn.getAttribute('data-v');
+          if(doRebuild) rebuild();
+        });
+      });
+    }
+    makeSeg('seg-mode','mode',true);
+    makeSeg('seg-curve','curve',true);
+
+    document.getElementById('inp-color').addEventListener('input',function(){
+      cfg.color=this.value;
+      if(currentMesh&&currentMesh.material) currentMesh.material.color.set(cfg.color);
+    });
+
+    document.getElementById('btn-rand').addEventListener('click',rebuild);
+    document.getElementById('btn-reset').addEventListener('click',function(){ resetCamera(); });
+    document.getElementById('btn-stl').addEventListener('click',exportSTL);
+    document.getElementById('btn-svg').addEventListener('click',exportSVG);
+
+    // INIT
+    document.getElementById('loading').style.display='none';
+    rebuild();
+
+  })();
   </script>
+
 </body>
 </html>
