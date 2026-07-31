@@ -2,9 +2,9 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>3D Voronoi & Honeycomb Generator</title>
-  <meta name="description" content="Parametric 3D Voronoi & Honeycomb pattern generator with clean 3D extrusion." />
+  <meta name="description" content="Parametric 3D Voronoi & Honeycomb pattern generator with mobile touch controls." />
   
   <!-- Google Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -26,12 +26,13 @@
       --shadow: 0 1px 3px rgba(60,64,67,.15),0 1px 2px rgba(60,64,67,.12);
       --shadow2: 0 4px 12px rgba(60,64,67,.18);
     }
-    * { box-sizing: border-box; margin: 0; padding: 0; }
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
     body {
       font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
       background: var(--bg);
       color: var(--text);
       height: 100vh;
+      height: 100dvh;
       overflow: hidden;
       display: flex;
       flex-direction: column;
@@ -39,37 +40,71 @@
 
     /* HEADER */
     .header {
-      height: 58px;
+      height: 54px;
       background: var(--surface);
       border-bottom: 1px solid var(--border);
       display: flex;
       align-items: center;
       justify-content: space-between;
-      padding: 0 20px;
+      padding: 0 16px;
       flex-shrink: 0;
+      z-index: 10;
     }
-    .brand { display: flex; align-items: center; gap: 12px; }
+    .brand { display: flex; align-items: center; gap: 10px; }
     .logo {
-      width: 34px; height: 34px;
+      width: 32px; height: 32px;
       background: linear-gradient(135deg, var(--blue), var(--green));
-      border-radius: 9px;
+      border-radius: 8px;
       display: flex; align-items: center; justify-content: center;
-      color: #fff; font-weight: 700; font-size: 14px; letter-spacing: -0.5px;
+      color: #fff; font-weight: 700; font-size: 13px; letter-spacing: -0.5px;
     }
-    .brand-text h1 { font-size: 16px; font-weight: 600; }
-    .brand-text p { font-size: 12px; color: var(--text2); font-weight: 400; }
+    .brand-text h1 { font-size: 15px; font-weight: 600; }
+    .brand-text p { font-size: 11px; color: var(--text2); font-weight: 400; }
     .gh-link {
       display: flex; align-items: center; gap: 6px;
-      text-decoration: none; color: var(--text2);
-      font-size: 13px; font-weight: 500;
-      background: var(--blue-light); color: var(--blue);
-      padding: 6px 14px; border-radius: 20px;
+      text-decoration: none; color: var(--blue);
+      font-size: 12px; font-weight: 600;
+      background: var(--blue-light);
+      padding: 6px 12px; border-radius: 20px;
       transition: background .15s;
     }
     .gh-link:hover { background: #D2E3FC; }
 
     /* LAYOUT */
-    .workspace { display: flex; flex: 1; overflow: hidden; }
+    .workspace { display: flex; flex: 1; overflow: hidden; position: relative; }
+
+    /* FLOATING MENU BUTTON & BACKDROP FOR MOBILE */
+    .fab-menu {
+      display: none;
+      align-items: center;
+      gap: 6px;
+      padding: 9px 16px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 24px;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--blue);
+      box-shadow: var(--shadow2);
+      cursor: pointer;
+      z-index: 100;
+    }
+
+    .backdrop {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.4);
+      backdrop-filter: blur(3px);
+      -webkit-backdrop-filter: blur(3px);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.25s ease;
+      z-index: 998;
+    }
+    .backdrop.active {
+      opacity: 1;
+      pointer-events: auto;
+    }
 
     /* SIDEBAR */
     .sidebar {
@@ -83,6 +118,22 @@
       gap: 14px;
       flex-shrink: 0;
     }
+    .sidebar-header-mobile {
+      display: none;
+      align-items: center;
+      justify-content: space-between;
+      padding-bottom: 10px;
+      border-bottom: 1px solid var(--border);
+    }
+    .sidebar-header-mobile h2 {
+      font-size: 15px; font-weight: 700; color: var(--text);
+    }
+    .btn-close-mobile {
+      background: transparent; border: none;
+      font-size: 20px; color: var(--text2); cursor: pointer;
+      padding: 4px 8px; border-radius: 50%;
+    }
+
     .card {
       border: 1px solid var(--border);
       border-radius: 14px;
@@ -104,10 +155,10 @@
     /* Slider */
     input[type=range] {
       -webkit-appearance: none; width: 100%;
-      height: 5px; background: #E8EAED; border-radius: 3px; outline: none;
+      height: 6px; background: #E8EAED; border-radius: 3px; outline: none;
     }
     input[type=range]::-webkit-slider-thumb {
-      -webkit-appearance: none; width: 17px; height: 17px;
+      -webkit-appearance: none; width: 18px; height: 18px;
       border-radius: 50%; background: var(--blue); cursor: pointer;
       box-shadow: 0 1px 3px rgba(0,0,0,.2);
       transition: transform .1s;
@@ -121,7 +172,7 @@
     }
     .seg-btn {
       flex: 1; border: none; background: transparent;
-      padding: 7px 6px; font-size: 11px; font-weight: 500;
+      padding: 8px 6px; font-size: 11px; font-weight: 500;
       color: var(--text2); border-radius: 7px; cursor: pointer;
       transition: all .15s;
     }
@@ -134,7 +185,7 @@
     .color-row { display: flex; align-items: center; justify-content: space-between; }
     input[type=color] {
       -webkit-appearance: none; border: none;
-      width: 34px; height: 34px; border-radius: 50%; cursor: pointer; overflow: hidden;
+      width: 36px; height: 36px; border-radius: 50%; cursor: pointer; overflow: hidden;
     }
     input[type=color]::-webkit-color-swatch-wrapper { padding: 0; }
     input[type=color]::-webkit-color-swatch { border: 2px solid var(--border); border-radius: 50%; }
@@ -142,7 +193,7 @@
     /* Buttons */
     .btn {
       display: flex; align-items: center; justify-content: center; gap: 7px;
-      width: 100%; padding: 10px 14px; font-size: 13px; font-weight: 600;
+      width: 100%; padding: 11px 14px; font-size: 13px; font-weight: 600;
       border-radius: 22px; border: none; cursor: pointer;
       transition: all .15s;
     }
@@ -165,16 +216,16 @@
     .status-bar.err { color: #EA4335; }
 
     /* VIEWPORT */
-    .viewport { flex: 1; position: relative; }
-    #canvas3d { width: 100%; height: 100%; display: block; }
+    .viewport { flex: 1; position: relative; touch-action: none; }
+    #canvas3d { width: 100%; height: 100%; display: block; touch-action: none; }
     .v-overlay {
       position: absolute; bottom: 16px; right: 16px;
-      display: flex; gap: 8px;
+      display: flex; gap: 8px; z-index: 10;
     }
     .v-btn {
       background: var(--surface); border: 1px solid var(--border);
-      border-radius: 20px; padding: 7px 15px;
-      font-size: 12px; font-weight: 500; color: var(--text2);
+      border-radius: 20px; padding: 8px 16px;
+      font-size: 12px; font-weight: 600; color: var(--text2);
       box-shadow: var(--shadow); cursor: pointer; transition: all .15s;
     }
     .v-btn:hover { color: var(--blue); box-shadow: var(--shadow2); }
@@ -183,7 +234,7 @@
       position: absolute; inset: 0;
       display: flex; flex-direction: column;
       align-items: center; justify-content: center;
-      background: var(--bg); font-size: 14px; color: var(--text2); gap: 12px;
+      background: var(--bg); font-size: 14px; color: var(--text2); gap: 12px; z-index: 20;
     }
     .spinner {
       width: 36px; height: 36px;
@@ -191,6 +242,50 @@
       border-radius: 50%; animation: spin .8s linear infinite;
     }
     @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* RESPONSIVE BREAKPOINTS (TABLET & MOBILE) */
+    @media (max-width: 880px) {
+      .header { padding: 0 12px; }
+      .brand-text p { display: none; }
+      .brand-text h1 { font-size: 14px; }
+      
+      .fab-menu {
+        display: flex;
+        position: absolute;
+        top: 12px;
+        left: 12px;
+      }
+
+      .sidebar {
+        position: fixed;
+        top: 0; left: 0; bottom: 0;
+        width: 310px;
+        max-width: 85vw;
+        z-index: 999;
+        transform: translateX(-100%);
+        transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        box-shadow: none;
+        border-right: 1px solid var(--border);
+      }
+      .sidebar.open {
+        transform: translateX(0);
+        box-shadow: 8px 0 32px rgba(0,0,0,0.25);
+      }
+
+      .sidebar-header-mobile {
+        display: flex;
+      }
+
+      input[type=range]::-webkit-slider-thumb {
+        width: 22px;
+        height: 22px;
+      }
+
+      .v-overlay {
+        bottom: 12px;
+        right: 12px;
+      }
+    }
   </style>
 </head>
 <body>
@@ -205,16 +300,27 @@
       </div>
     </div>
     <a href="https://github.com/Pannawat2008/Pannawat2008.github.io" target="_blank" class="gh-link">
-      <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
-      GitHub
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+      <span>GitHub</span>
     </a>
   </header>
 
   <!-- WORKSPACE -->
   <div class="workspace">
 
-    <!-- SIDEBAR -->
-    <aside class="sidebar">
+    <!-- BACKDROP & FLOATING MENU FOR MOBILE -->
+    <button class="fab-menu" id="btn-toggle-menu" aria-label="Toggle Controls">
+      ⚙️ Controls
+    </button>
+    <div class="backdrop" id="backdrop"></div>
+
+    <!-- SIDEBAR CONTROLS -->
+    <aside class="sidebar" id="sidebar">
+
+      <div class="sidebar-header-mobile">
+        <h2>Generator Controls</h2>
+        <button class="btn-close-mobile" id="btn-close-sidebar" aria-label="Close">✕</button>
+      </div>
 
       <div class="card">
         <div class="card-label">Pattern &amp; Blending</div>
@@ -338,6 +444,7 @@
     var controls = new THREE.OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
     controls.dampingFactor = 0.05;
+    controls.enableTouch = true; // Touch gesture support (pinch zoom & rotate)
 
     // Lighting
     scene.add(new THREE.AmbientLight(0xffffff, 0.7));
@@ -370,11 +477,16 @@
     }
     animate();
 
-    window.addEventListener('resize', function(){
+    function onResize() {
       W = vp.clientWidth; H = vp.clientHeight;
       camera.aspect = W / H;
       camera.updateProjectionMatrix();
       renderer.setSize(W, H);
+    }
+
+    window.addEventListener('resize', onResize);
+    window.addEventListener('orientationchange', function(){
+      setTimeout(onResize, 200);
     });
 
     // ─────────────────────────────────────────────────────────
@@ -408,13 +520,11 @@
       return out;
     }
 
-    // In 2D plane: area < 0 is Clockwise (CW) for Three.js holes
     function ensureClockwise(pts) {
       if (polygonArea(pts) > 0) return pts.slice().reverse();
       return pts;
     }
 
-    // In 2D plane: area > 0 is Counter-Clockwise (CCW) for Three.js outer shape
     function ensureCounterClockwise(pts) {
       if (polygonArea(pts) < 0) return pts.slice().reverse();
       return pts;
@@ -563,7 +673,6 @@
       var dx = v2.x - v1.x, dy = v2.y - v1.y;
       var len = Math.sqrt(dx * dx + dy * dy);
       if (len < 1e-7) return { v1: { x: v1.x, y: v1.y }, v2: { x: v2.x, y: v2.y } };
-      // Normal vector pointing inward into CCW polygon
       var nx = -dy / len * d;
       var ny = dx / len * d;
       return { v1: { x: v1.x + nx, y: v1.y + ny }, v2: { x: v2.x + nx, y: v2.y + ny } };
@@ -651,7 +760,6 @@
       var geoms = [];
 
       if (mode === 'cells') {
-        // Extrude each cell individually as a solid platform
         for (var i = 0; i < polys.length; i++) {
           var poly = ensureCounterClockwise(polys[i]);
           if (poly.length < 3) continue;
@@ -664,7 +772,6 @@
           geoms.push(new THREE.ExtrudeGeometry(s, { depth: depth, bevelEnabled: false }));
         }
       } else {
-        // 'walls' mode: solid outer rectangular frame with cell cutouts (holes)
         var outerBox = [
           { x: 0, y: 0 },
           { x: w, y: 0 },
@@ -680,7 +787,7 @@
 
         for (var i = 0; i < polys.length; i++) {
           var poly = cleanPolygon(polys[i]);
-          poly = ensureClockwise(poly); // Holes MUST be Clockwise for Three.js Earcut
+          poly = ensureClockwise(poly);
           if (poly.length < 3) continue;
 
           var hole = new THREE.Path();
@@ -695,7 +802,6 @@
 
       if (geoms.length === 0) return;
 
-      // Merge geometries cleanly
       var geom;
       if (geoms.length === 1) {
         geom = geoms[0];
@@ -713,7 +819,6 @@
         geom = merged;
       }
 
-      // Center geometry origin
       geom.computeBoundingBox();
       var box = geom.boundingBox;
       var cx = (box.max.x + box.min.x) / 2;
@@ -729,7 +834,7 @@
       });
 
       currentMesh = new THREE.Mesh(geom, mat);
-      currentMesh.rotation.x = -Math.PI / 2; // Lie flat on floor plane
+      currentMesh.rotation.x = -Math.PI / 2;
       currentMesh.castShadow = true;
       currentMesh.receiveShadow = true;
       scene.add(currentMesh);
@@ -752,15 +857,13 @@
           var seeds = generateHybridSeeds();
           var rawCells = computeVoronoiCells(seeds);
 
-          var halfGap = cfg.spacing / 2.0; // Inward offset per cell edge
+          var halfGap = cfg.spacing / 2.0;
           var polys = [];
 
           for (var i = 0; i < rawCells.length; i++) {
-            // Force CCW winding order so offsetSeg retracts edges INWARD into polygon
             var ccwCell = ensureCounterClockwise(rawCells[i]);
             var retracted = retractPolygon(ccwCell, halfGap);
 
-            // Skip collapsed micro-cells
             if (retracted.length >= 3 && Math.abs(polygonArea(retracted)) >= 20) {
               if (cfg.curve === 'fillet') retracted = applyCornerFillets(retracted);
               polys.push(retracted);
@@ -859,8 +962,26 @@
     }
 
     // ─────────────────────────────────────────────────────────
-    // UI BINDINGS
+    // MOBILE DRAWER HANDLERS & UI BINDINGS
     // ─────────────────────────────────────────────────────────
+
+    var sidebar = document.getElementById('sidebar');
+    var backdrop = document.getElementById('backdrop');
+    var btnToggleMenu = document.getElementById('btn-toggle-menu');
+    var btnCloseSidebar = document.getElementById('btn-close-sidebar');
+
+    function openSidebar() {
+      sidebar.classList.add('open');
+      backdrop.classList.add('active');
+    }
+    function closeSidebar() {
+      sidebar.classList.remove('open');
+      backdrop.classList.remove('active');
+    }
+
+    btnToggleMenu.addEventListener('click', openSidebar);
+    btnCloseSidebar.addEventListener('click', closeSidebar);
+    backdrop.addEventListener('click', closeSidebar);
 
     function bind(sliderId, valId, cfgKey, fmt) {
       var sl = document.getElementById(sliderId), vl = document.getElementById(valId);
