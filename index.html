@@ -4,339 +4,273 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>3D Voronoi & Honeycomb Generator</title>
-  <meta name="description" content="Parametric 3D Voronoi & Honeycomb pattern generator with interactive seed editing." />
-  
-  <!-- Google Fonts -->
+  <meta name="description" content="Parametric 3D Voronoi & Honeycomb pattern generator with organic shapes and interactive seed editing." />
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 
   <style>
     :root {
-      --bg: #F8F9FA;
-      --surface: #FFFFFF;
-      --border: #E0E0E0;
-      --blue: #1A73E8;
-      --blue-hover: #1557B0;
-      --blue-light: #E8F0FE;
-      --text: #202124;
-      --text2: #5F6368;
-      --text3: #9AA0A6;
+      --bg: #F8F9FA; --surface: #FFFFFF; --border: #E0E0E0;
+      --blue: #1A73E8; --blue-hover: #1557B0; --blue-light: #E8F0FE;
+      --text: #202124; --text2: #5F6368; --text3: #9AA0A6;
       --green: #34A853;
       --shadow: 0 1px 3px rgba(60,64,67,.15),0 1px 2px rgba(60,64,67,.12);
       --shadow2: 0 4px 12px rgba(60,64,67,.18);
     }
     * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
     body {
-      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
-      background: var(--bg);
-      color: var(--text);
-      height: 100vh;
-      height: 100dvh;
-      overflow: hidden;
-      display: flex;
-      flex-direction: column;
+      font-family: 'Inter', -apple-system, sans-serif;
+      background: var(--bg); color: var(--text);
+      height: 100vh; height: 100dvh; overflow: hidden;
+      display: flex; flex-direction: column;
     }
 
     /* HEADER */
     .header {
-      height: 54px;
-      background: var(--surface);
+      height: 52px; background: var(--surface);
       border-bottom: 1px solid var(--border);
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 0 16px;
-      flex-shrink: 0;
-      z-index: 10;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 16px; flex-shrink: 0; z-index: 10;
     }
     .brand { display: flex; align-items: center; gap: 10px; }
     .logo {
-      width: 32px; height: 32px;
+      width: 30px; height: 30px;
       background: linear-gradient(135deg, var(--blue), var(--green));
-      border-radius: 8px;
-      display: flex; align-items: center; justify-content: center;
-      color: #fff; font-weight: 700; font-size: 13px; letter-spacing: -0.5px;
+      border-radius: 8px; display: flex; align-items: center;
+      justify-content: center; color: #fff; font-weight: 700; font-size: 12px;
     }
-    .brand-text h1 { font-size: 15px; font-weight: 600; }
-    .brand-text p { font-size: 11px; color: var(--text2); font-weight: 400; }
+    .brand-text h1 { font-size: 14px; font-weight: 700; }
+    .brand-text p { font-size: 11px; color: var(--text2); }
     .gh-link {
-      display: flex; align-items: center; gap: 6px;
-      text-decoration: none; color: var(--blue);
-      font-size: 12px; font-weight: 600;
-      background: var(--blue-light);
-      padding: 6px 12px; border-radius: 20px;
-      transition: background .15s;
+      display: flex; align-items: center; gap: 5px;
+      text-decoration: none; color: var(--blue); font-size: 12px; font-weight: 600;
+      background: var(--blue-light); padding: 5px 12px; border-radius: 20px;
     }
-    .gh-link:hover { background: #D2E3FC; }
 
-    /* LAYOUT */
+    /* MAIN LAYOUT */
     .workspace { display: flex; flex: 1; overflow: hidden; position: relative; }
-
-    /* FLOATING MENU BUTTON & BACKDROP FOR MOBILE */
-    .fab-menu {
-      display: none;
-      align-items: center;
-      gap: 6px;
-      padding: 9px 16px;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 24px;
-      font-size: 13px;
-      font-weight: 600;
-      color: var(--blue);
-      box-shadow: var(--shadow2);
-      cursor: pointer;
-      z-index: 100;
-    }
-
-    .backdrop {
-      position: fixed;
-      inset: 0;
-      background: rgba(0, 0, 0, 0.4);
-      backdrop-filter: blur(3px);
-      -webkit-backdrop-filter: blur(3px);
-      opacity: 0;
-      pointer-events: none;
-      transition: opacity 0.25s ease;
-      z-index: 998;
-    }
-    .backdrop.active {
-      opacity: 1;
-      pointer-events: auto;
-    }
 
     /* SIDEBAR */
     .sidebar {
-      width: 330px;
-      background: var(--surface);
+      width: 290px; background: var(--surface);
       border-right: 1px solid var(--border);
-      overflow-y: auto;
-      padding: 16px;
-      display: flex;
-      flex-direction: column;
-      gap: 14px;
-      flex-shrink: 0;
+      overflow-y: auto; padding: 12px;
+      display: flex; flex-direction: column; gap: 10px; flex-shrink: 0;
     }
     .sidebar-header-mobile {
-      display: none;
-      align-items: center;
-      justify-content: space-between;
-      padding-bottom: 10px;
-      border-bottom: 1px solid var(--border);
+      display: none; align-items: center; justify-content: space-between;
+      padding-bottom: 8px; border-bottom: 1px solid var(--border);
     }
-    .sidebar-header-mobile h2 {
-      font-size: 15px; font-weight: 700; color: var(--text);
-    }
+    .sidebar-header-mobile h2 { font-size: 14px; font-weight: 700; }
     .btn-close-mobile {
-      background: transparent; border: none;
-      font-size: 20px; color: var(--text2); cursor: pointer;
-      padding: 4px 8px; border-radius: 50%;
+      background: transparent; border: none; font-size: 18px; color: var(--text2); cursor: pointer;
     }
 
-    .card {
-      border: 1px solid var(--border);
-      border-radius: 14px;
-      padding: 14px;
-    }
+    /* CARDS */
+    .card { border: 1px solid var(--border); border-radius: 12px; padding: 12px; }
     .card-label {
-      font-size: 11px; font-weight: 700;
-      color: var(--blue); text-transform: uppercase;
-      letter-spacing: .6px; margin-bottom: 12px;
+      font-size: 10px; font-weight: 700; color: var(--blue);
+      text-transform: uppercase; letter-spacing: .7px; margin-bottom: 10px;
     }
-    .ctrl { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
+    .ctrl { display: flex; flex-direction: column; gap: 5px; margin-bottom: 10px; }
     .ctrl:last-child { margin-bottom: 0; }
-    .lrow {
-      display: flex; justify-content: space-between;
-      font-size: 12px; color: var(--text2); font-weight: 500;
-    }
+    .lrow { display: flex; justify-content: space-between; font-size: 11px; color: var(--text2); font-weight: 500; }
     .lval { font-weight: 700; color: var(--text); }
 
-    /* Slider */
     input[type=range] {
       -webkit-appearance: none; width: 100%;
-      height: 6px; background: #E8EAED; border-radius: 3px; outline: none;
+      height: 5px; background: #E8EAED; border-radius: 3px; outline: none;
     }
     input[type=range]::-webkit-slider-thumb {
-      -webkit-appearance: none; width: 18px; height: 18px;
+      -webkit-appearance: none; width: 17px; height: 17px;
       border-radius: 50%; background: var(--blue); cursor: pointer;
-      box-shadow: 0 1px 3px rgba(0,0,0,.2);
-      transition: transform .1s;
+      box-shadow: 0 1px 3px rgba(0,0,0,.2); transition: transform .1s;
     }
     input[type=range]::-webkit-slider-thumb:hover { transform: scale(1.2); }
 
-    /* Segmented */
     .seg {
       display: flex; background: var(--bg);
-      border: 1px solid var(--border); border-radius: 9px; padding: 3px; gap: 3px;
+      border: 1px solid var(--border); border-radius: 8px; padding: 2px; gap: 2px;
     }
     .seg-btn {
       flex: 1; border: none; background: transparent;
-      padding: 8px 4px; font-size: 11px; font-weight: 500;
-      color: var(--text2); border-radius: 7px; cursor: pointer;
-      transition: all .15s; text-align: center;
+      padding: 6px 3px; font-size: 10px; font-weight: 500;
+      color: var(--text2); border-radius: 6px; cursor: pointer; transition: all .15s; text-align: center;
     }
     .seg-btn.active {
       background: var(--surface); color: var(--blue);
       font-weight: 700; box-shadow: var(--shadow);
     }
 
-    /* Color */
     .color-row { display: flex; align-items: center; justify-content: space-between; }
     input[type=color] {
       -webkit-appearance: none; border: none;
-      width: 36px; height: 36px; border-radius: 50%; cursor: pointer; overflow: hidden;
+      width: 32px; height: 32px; border-radius: 50%; cursor: pointer; overflow: hidden;
     }
     input[type=color]::-webkit-color-swatch-wrapper { padding: 0; }
     input[type=color]::-webkit-color-swatch { border: 2px solid var(--border); border-radius: 50%; }
 
-    /* Buttons */
     .btn {
-      display: flex; align-items: center; justify-content: center; gap: 7px;
-      width: 100%; padding: 10px 14px; font-size: 12px; font-weight: 600;
-      border-radius: 22px; border: none; cursor: pointer;
-      transition: all .15s;
+      display: flex; align-items: center; justify-content: center; gap: 6px;
+      width: 100%; padding: 9px 12px; font-size: 11px; font-weight: 600;
+      border-radius: 20px; border: none; cursor: pointer; transition: all .15s;
     }
     .btn-blue { background: var(--blue); color: #fff; }
     .btn-blue:hover { background: var(--blue-hover); box-shadow: var(--shadow2); }
     .btn-light { background: var(--blue-light); color: var(--blue); }
     .btn-light:hover { background: #D2E3FC; }
-    .btn-outline {
-      background: transparent; border: 1px solid var(--border); color: var(--text2);
-    }
+    .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text2); }
     .btn-outline:hover { background: var(--bg); color: var(--text); }
-    .btn-group { display: flex; flex-direction: column; gap: 8px; }
+    .btn-group { display: flex; flex-direction: column; gap: 6px; }
 
-    /* STATUS */
     .status-bar {
-      font-size: 11px; color: var(--text3); text-align: center;
-      padding: 6px 0 2px; font-weight: 500;
+      font-size: 10px; color: var(--text3); text-align: center;
+      padding: 5px 0 2px; font-weight: 500;
     }
     .status-bar.ok { color: #34A853; }
     .status-bar.err { color: #EA4335; }
 
-    /* VIEWPORT */
-    .viewport { flex: 1; position: relative; }
+    /* CONTENT AREA: 2D + 3D SPLIT */
+    .content-area {
+      flex: 1; display: flex; overflow: hidden; gap: 0;
+    }
+
+    /* 2D SVG PREVIEW */
+    .preview-2d {
+      flex: 1; position: relative; background: #fff;
+      border-right: 1px solid var(--border);
+      overflow: hidden; display: flex; flex-direction: column;
+    }
+    .pane-label {
+      position: absolute; top: 10px; left: 50%; transform: translateX(-50%);
+      background: var(--surface); border: 1px solid var(--border);
+      padding: 4px 12px; border-radius: 12px; font-size: 11px;
+      font-weight: 600; color: var(--text2); z-index: 10;
+      box-shadow: var(--shadow);
+    }
+    #svg2d {
+      width: 100%; height: 100%;
+    }
+
+    /* 3D VIEWPORT */
+    .viewport {
+      flex: 1; position: relative;
+    }
     #canvas3d { width: 100%; height: 100%; display: block; }
+
     .v-overlay {
-      position: absolute; bottom: 16px; right: 16px;
+      position: absolute; bottom: 12px; right: 12px;
       display: flex; gap: 8px; z-index: 10;
     }
     .v-btn {
       background: var(--surface); border: 1px solid var(--border);
-      border-radius: 20px; padding: 8px 16px;
-      font-size: 12px; font-weight: 600; color: var(--text2);
+      border-radius: 16px; padding: 7px 14px;
+      font-size: 11px; font-weight: 600; color: var(--text2);
       box-shadow: var(--shadow); cursor: pointer; transition: all .15s;
     }
-    .v-btn:hover { color: var(--blue); box-shadow: var(--shadow2); }
+    .v-btn:hover { color: var(--blue); }
 
-    /* Mode indicator badge on viewport */
     .mode-badge {
-      position: absolute; top: 16px; right: 16px;
+      position: absolute; top: 10px; right: 10px;
       background: var(--surface); border: 1px solid var(--border);
-      padding: 6px 14px; border-radius: 20px; font-size: 12px; font-weight: 600;
-      color: var(--blue); box-shadow: var(--shadow); z-index: 10;
-      display: flex; align-items: center; gap: 6px;
+      padding: 5px 12px; border-radius: 16px; font-size: 11px;
+      font-weight: 600; color: var(--blue); box-shadow: var(--shadow); z-index: 10;
     }
 
     #loading {
       position: absolute; inset: 0;
       display: flex; flex-direction: column;
       align-items: center; justify-content: center;
-      background: var(--bg); font-size: 14px; color: var(--text2); gap: 12px; z-index: 20;
+      background: var(--bg); font-size: 14px; color: var(--text2); gap: 10px; z-index: 20;
     }
     .spinner {
-      width: 36px; height: 36px;
+      width: 32px; height: 32px;
       border: 3px solid var(--border); border-top-color: var(--blue);
       border-radius: 50%; animation: spin .8s linear infinite;
     }
     @keyframes spin { to { transform: rotate(360deg); } }
 
-    /* RESPONSIVE BREAKPOINTS (TABLET & MOBILE) */
-    @media (max-width: 880px) {
-      .header { padding: 0 12px; }
-      .brand-text p { display: none; }
-      .brand-text h1 { font-size: 14px; }
-      
+    /* MOBILE FLOATING BUTTON & BACKDROP */
+    .fab-menu {
+      display: none; align-items: center; gap: 6px;
+      padding: 8px 14px; background: var(--surface);
+      border: 1px solid var(--border); border-radius: 24px;
+      font-size: 12px; font-weight: 600; color: var(--blue);
+      box-shadow: var(--shadow2); cursor: pointer; z-index: 100;
+    }
+    .backdrop {
+      position: fixed; inset: 0; background: rgba(0,0,0,.4);
+      backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px);
+      opacity: 0; pointer-events: none; transition: opacity .25s; z-index: 998;
+    }
+    .backdrop.active { opacity: 1; pointer-events: auto; }
+
+    @media (max-width: 900px) {
       .fab-menu {
-        display: flex;
-        position: absolute;
-        top: 12px;
-        left: 12px;
+        display: flex; position: absolute; top: 10px; left: 10px;
       }
-
       .sidebar {
-        position: fixed;
-        top: 0; left: 0; bottom: 0;
-        width: 310px;
-        max-width: 85vw;
-        z-index: 999;
-        transform: translateX(-100%);
-        transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-        box-shadow: none;
-        border-right: 1px solid var(--border);
+        position: fixed; top: 0; left: 0; bottom: 0;
+        width: 290px; max-width: 86vw;
+        z-index: 999; transform: translateX(-100%);
+        transition: transform .3s cubic-bezier(.4,0,.2,1);
       }
-      .sidebar.open {
-        transform: translateX(0);
-        box-shadow: 8px 0 32px rgba(0,0,0,0.25);
-      }
+      .sidebar.open { transform: translateX(0); box-shadow: 8px 0 32px rgba(0,0,0,.25); }
+      .sidebar-header-mobile { display: flex; }
+      input[type=range]::-webkit-slider-thumb { width: 20px; height: 20px; }
+    }
 
-      .sidebar-header-mobile {
-        display: flex;
-      }
-
-      input[type=range]::-webkit-slider-thumb {
-        width: 22px;
-        height: 22px;
-      }
-
-      .v-overlay {
-        bottom: 12px;
-        right: 12px;
-      }
+    @media (max-width: 620px) {
+      .content-area { flex-direction: column; }
+      .preview-2d { border-right: none; border-bottom: 1px solid var(--border); }
     }
   </style>
 </head>
 <body>
 
-  <!-- HEADER -->
   <header class="header">
     <div class="brand">
       <div class="logo">V3D</div>
       <div class="brand-text">
         <h1>Voronoi &amp; Honeycomb 3D</h1>
-        <p>Parametric 3D Pattern Generator &amp; STL Exporter</p>
+        <p>Parametric Generator &amp; STL Exporter</p>
       </div>
     </div>
     <a href="https://github.com/Pannawat2008/Pannawat2008.github.io" target="_blank" class="gh-link">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
-      <span>GitHub</span>
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+      GitHub
     </a>
   </header>
 
-  <!-- WORKSPACE -->
   <div class="workspace">
 
-    <!-- FLOATING MENU BUTTON & BACKDROP FOR MOBILE -->
-    <button class="fab-menu" id="btn-toggle-menu" aria-label="Toggle Controls">
-      ⚙️ Controls
-    </button>
+    <!-- MOBILE FLOATING BUTTON -->
+    <button class="fab-menu" id="btn-toggle-menu" aria-label="Controls">⚙️ Controls</button>
     <div class="backdrop" id="backdrop"></div>
 
-    <!-- SIDEBAR CONTROLS -->
+    <!-- SIDEBAR -->
     <aside class="sidebar" id="sidebar">
 
       <div class="sidebar-header-mobile">
-        <h2>Generator Controls</h2>
-        <button class="btn-close-mobile" id="btn-close-sidebar" aria-label="Close">✕</button>
+        <h2>Controls</h2>
+        <button class="btn-close-mobile" id="btn-close-sidebar">✕</button>
       </div>
 
-      <!-- CARD 1: PATTERN & SEED EDITING -->
+      <!-- Pattern Type -->
       <div class="card">
-        <div class="card-label">Pattern &amp; Seed Editing</div>
-        
+        <div class="card-label">Pattern Layout</div>
+
         <div class="ctrl">
-          <div class="lrow" style="margin-bottom:5px">Pointer Mode</div>
+          <div class="lrow" style="margin-bottom:4px">Panel Shape</div>
+          <div class="seg" id="seg-shape">
+            <button class="seg-btn active" data-v="rect">Rectangle</button>
+            <button class="seg-btn" data-v="blob">Organic Blob</button>
+          </div>
+        </div>
+
+        <div class="ctrl">
+          <div class="lrow" style="margin-bottom:4px">Pointer Mode</div>
           <div class="seg" id="seg-mouse-mode">
             <button class="seg-btn active" data-v="navigate">3D View</button>
             <button class="seg-btn" data-v="add">Add</button>
@@ -346,33 +280,33 @@
         </div>
 
         <div class="ctrl">
-          <div class="lrow"><span>Seed Count</span><span class="lval" id="v-seeds">30</span></div>
-          <input type="range" id="s-seeds" min="8" max="90" value="30" step="1">
+          <div class="lrow"><span>Seed Count</span><span class="lval" id="v-seeds">50</span></div>
+          <input type="range" id="s-seeds" min="8" max="120" value="50" step="1">
         </div>
-        
+
         <div class="ctrl">
-          <div class="lrow"><span>Honeycomb Blend</span><span class="lval" id="v-blend">50%</span></div>
-          <input type="range" id="s-blend" min="0" max="1" value="0.5" step="0.05">
+          <div class="lrow"><span>Center Density</span><span class="lval" id="v-density">60%</span></div>
+          <input type="range" id="s-density" min="0" max="1" value="0.6" step="0.05">
         </div>
-        
+
         <div class="ctrl">
-          <label style="display:flex; align-items:center; gap:8px; font-size:12px; font-weight:500; cursor:pointer; color:var(--text2);">
+          <label style="display:flex;align-items:center;gap:8px;font-size:11px;font-weight:500;cursor:pointer;color:var(--text2)">
             <input type="checkbox" id="chk-show-seeds" checked />
-            <span>Show Seed Point Spheres</span>
+            Show Seed Dots / Spheres
           </label>
         </div>
 
         <div class="ctrl">
-          <button class="btn btn-outline" id="btn-rand">🎲 Resample Poisson Seeds</button>
+          <button class="btn btn-outline" id="btn-rand">🎲 Resample Seeds</button>
         </div>
       </div>
 
-      <!-- CARD 2: 3D GEOMETRY -->
+      <!-- Geometry -->
       <div class="card">
         <div class="card-label">3D Geometry</div>
         <div class="ctrl">
-          <div class="lrow"><span>Wall Thickness (Spacing)</span><span class="lval" id="v-spacing">4.0 mm</span></div>
-          <input type="range" id="s-spacing" min="1.0" max="10" value="4.0" step="0.5">
+          <div class="lrow"><span>Wall Thickness</span><span class="lval" id="v-spacing">4.0 mm</span></div>
+          <input type="range" id="s-spacing" min="1" max="10" value="4" step="0.5">
         </div>
         <div class="ctrl">
           <div class="lrow"><span>Extrusion Height</span><span class="lval" id="v-depth">12 mm</span></div>
@@ -388,86 +322,96 @@
         </div>
       </div>
 
-      <!-- CARD 3: STYLES & COLOR -->
+      <!-- Style -->
       <div class="card">
-        <div class="card-label">Style &amp; Mode</div>
+        <div class="card-label">Style</div>
         <div class="ctrl">
-          <div class="lrow" style="margin-bottom:5px">Extrusion Mode</div>
+          <div class="lrow" style="margin-bottom:4px">Extrusion Mode</div>
           <div class="seg" id="seg-mode">
-            <button class="seg-btn active" data-v="walls">Solid Frame (Grille)</button>
+            <button class="seg-btn active" data-v="walls">Solid Frame</button>
             <button class="seg-btn" data-v="cells">Solid Cells</button>
           </div>
         </div>
         <div class="ctrl">
-          <div class="lrow" style="margin-bottom:5px">Corner Rounding</div>
+          <div class="lrow" style="margin-bottom:4px">Corners</div>
           <div class="seg" id="seg-curve">
-            <button class="seg-btn active" data-v="fillet">Rounded Corners</button>
-            <button class="seg-btn" data-v="linear">Sharp Corners</button>
+            <button class="seg-btn active" data-v="fillet">Rounded</button>
+            <button class="seg-btn" data-v="linear">Sharp</button>
           </div>
         </div>
         <div class="ctrl color-row">
-          <span style="font-size:12px;font-weight:500;color:var(--text2)">Model Color</span>
+          <span style="font-size:11px;font-weight:500;color:var(--text2)">Model Color</span>
           <input type="color" id="inp-color" value="#4285F4">
         </div>
       </div>
 
-      <!-- CARD 4: EXPORT & SEED DATA -->
+      <!-- Export -->
       <div class="card">
-        <div class="card-label">Export &amp; Seed JSON</div>
+        <div class="card-label">Export</div>
         <div class="btn-group">
-          <button class="btn btn-blue" id="btn-stl">📥 Export STL (3D Printing)</button>
-          <button class="btn btn-light" id="btn-svg">📄 Export SVG (Laser Cut)</button>
-          <button class="btn btn-outline" id="btn-export-seeds">💾 Export Seeds (JSON)</button>
-          <button class="btn btn-outline" id="btn-import-seeds">📂 Import Seeds (JSON)</button>
-          <input type="file" id="inp-file-seeds" accept=".json" style="display:none;" />
+          <button class="btn btn-blue" id="btn-stl">📥 Export STL</button>
+          <button class="btn btn-light" id="btn-svg">📄 Export SVG</button>
+          <button class="btn btn-outline" id="btn-export-seeds">💾 Export Seeds JSON</button>
+          <button class="btn btn-outline" id="btn-import-seeds">📂 Import Seeds JSON</button>
+          <input type="file" id="inp-file-seeds" accept=".json" style="display:none;">
         </div>
         <div class="status-bar" id="status">Ready</div>
       </div>
 
     </aside>
 
-    <!-- 3D VIEWPORT -->
-    <div class="viewport">
-      <div class="mode-badge" id="badge-pointer-mode">
-        <span>📍 Mode: 3D View</span>
+    <!-- CONTENT: 2D + 3D SPLIT -->
+    <div class="content-area">
+
+      <!-- 2D SVG PREVIEW -->
+      <div class="preview-2d" id="pane-2d">
+        <div class="pane-label">📐 2D Pattern Preview</div>
+        <svg id="svg2d" xmlns="http://www.w3.org/2000/svg"></svg>
       </div>
-      <canvas id="canvas3d"></canvas>
-      <div id="loading">
-        <div class="spinner"></div>
-        <span>Loading 3D engine…</span>
+
+      <!-- 3D VIEWPORT -->
+      <div class="viewport" id="pane-3d">
+        <div class="mode-badge" id="badge-pointer-mode">📍 3D View</div>
+        <canvas id="canvas3d"></canvas>
+        <div id="loading">
+          <div class="spinner"></div>
+          <span>Loading 3D engine…</span>
+        </div>
+        <div class="v-overlay">
+          <button class="v-btn" id="btn-reset">🎯 Reset Camera</button>
+        </div>
       </div>
-      <div class="v-overlay">
-        <button class="v-btn" id="btn-reset">🎯 Reset Camera</button>
-      </div>
+
     </div>
 
   </div>
 
-  <!-- THREE.JS & DEPENDENCIES -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
   <script src="https://cdn.jsdelivr.net/gh/gorhill/Javascript-Voronoi@master/rhill-voronoi-core.js"></script>
 
   <script>
   (function(){
-    // CONFIG
+
     var cfg = {
       w: 200, h: 120,
-      seeds: 30,
+      seeds: 50,
       spacing: 4.0,
       depth: 12,
-      blend: 0.5,
+      density: 0.6,      // 0 = uniform hex, 1 = max tiny center voronoi
       mode: 'walls',
       curve: 'fillet',
       color: '#4285F4',
-      pointerMode: 'navigate', // 'navigate', 'add', 'move', 'delete'
+      shape: 'rect',     // 'rect' or 'blob'
+      pointerMode: 'navigate',
       showSeeds: true
     };
 
     var currentSeeds = [];
     var cellPolygons = [];
+    var clippedPolygons = [];
 
-    // ── THREE.JS SCENE SETUP ─────────────────────────────────
+    // ─── THREE.JS ────────────────────────────────────────────
     var canvas = document.getElementById('canvas3d');
     var renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true });
     renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
@@ -484,24 +428,16 @@
     resetCamera();
 
     var controls = new THREE.OrbitControls(camera, renderer.domElement);
-    controls.enableDamping = true;
-    controls.dampingFactor = 0.05;
-    controls.enableTouch = true;
+    controls.enableDamping = true; controls.dampingFactor = 0.05; controls.enableTouch = true;
 
-    // Lighting
     scene.add(new THREE.AmbientLight(0xffffff, 0.7));
     var sun = new THREE.DirectionalLight(0xffffff, 0.85);
-    sun.position.set(150, 300, 200);
-    sun.castShadow = true;
-    scene.add(sun);
+    sun.position.set(150, 300, 200); sun.castShadow = true; scene.add(sun);
     var fill = new THREE.DirectionalLight(0xaaccff, 0.35);
-    fill.position.set(-150, -150, -100);
-    scene.add(fill);
+    fill.position.set(-150, -150, -100); scene.add(fill);
 
-    // Floor Grid
     var grid = new THREE.GridHelper(800, 40, 0xd0d0d0, 0xe8e8e8);
-    grid.position.y = -0.5;
-    scene.add(grid);
+    grid.position.y = -0.5; scene.add(grid);
 
     var currentMesh = null;
     var seedSpheresGroup = new THREE.Group();
@@ -514,313 +450,348 @@
       if (controls) { controls.target.set(0, 0, 0); controls.update(); }
     }
 
-    function animate() {
-      requestAnimationFrame(animate);
-      controls.update();
-      renderer.render(scene, camera);
-    }
-    animate();
+    (function animLoop(){ requestAnimationFrame(animLoop); controls.update(); renderer.render(scene, camera); })();
 
     function onResize() {
       W = vp.clientWidth; H = vp.clientHeight;
-      camera.aspect = W / H;
-      camera.updateProjectionMatrix();
-      renderer.setSize(W, H);
+      camera.aspect = W / H; camera.updateProjectionMatrix(); renderer.setSize(W, H);
     }
-
     window.addEventListener('resize', onResize);
-    window.addEventListener('orientationchange', function(){
-      setTimeout(onResize, 200);
-    });
+    window.addEventListener('orientationchange', function(){ setTimeout(onResize, 200); });
 
-    // ─────────────────────────────────────────────────────────
-    // GEOMETRY & WINDING ORDER UTILITIES
-    // ─────────────────────────────────────────────────────────
-
-    function dist(a,b){ var dx=a.x-b.x, dy=a.y-b.y; return Math.sqrt(dx*dx+dy*dy); }
+    // ─── MATH UTILS ─────────────────────────────────────────
+    function dist(a, b){ var dx=a.x-b.x, dy=a.y-b.y; return Math.sqrt(dx*dx+dy*dy); }
     function smoothstep(mn, mx, v){
       var x = Math.max(0, Math.min(1, (v-mn)/(mx-mn)));
       return x*x*(3-2*x);
     }
-
-    function polygonArea(pts) {
-      var area = 0;
-      for (var i = 0; i < pts.length; i++) {
-        var j = (i + 1) % pts.length;
-        area += pts[i].x * pts[j].y;
-        area -= pts[j].x * pts[i].y;
+    function polygonArea(pts){
+      var a=0;
+      for(var i=0;i<pts.length;i++){
+        var j=(i+1)%pts.length;
+        a += pts[i].x*pts[j].y - pts[j].x*pts[i].y;
       }
-      return area / 2.0;
+      return a/2;
+    }
+    function cleanPoly(pts){
+      var out=[];
+      for(var i=0;i<pts.length;i++){
+        var n=pts[(i+1)%pts.length];
+        if(dist(pts[i],n)>0.3) out.push(pts[i]);
+      }
+      return out;
+    }
+    function ensureCCW(pts){ if(polygonArea(pts)<0) return pts.slice().reverse(); return pts; }
+    function ensureCW(pts){ if(polygonArea(pts)>0) return pts.slice().reverse(); return pts; }
+
+    // ─── ORGANIC BLOB SHAPE ───────────────────────────────────
+    function getBlobPoints(cx, cy, rx, ry, bumpAmp, bumpFreq, N) {
+      var pts = [];
+      for (var i = 0; i < N; i++) {
+        var angle = (i / N) * Math.PI * 2;
+        var bump = 1 + bumpAmp * Math.sin(bumpFreq * angle + 0.5);
+        pts.push({
+          x: cx + rx * bump * Math.cos(angle),
+          y: cy + ry * bump * Math.sin(angle)
+        });
+      }
+      return pts;
     }
 
-    function cleanPolygon(pts) {
+    function pointInBlob(p, cx, cy, rx, ry, bumpAmp, bumpFreq) {
+      var dx = p.x - cx, dy = p.y - cy;
+      var angle = Math.atan2(dy, dx);
+      var bump = 1 + bumpAmp * Math.sin(bumpFreq * angle + 0.5);
+      var normR = Math.sqrt((dx / (rx * bump)) * (dx / (rx * bump)) + (dy / (ry * bump)) * (dy / (ry * bump)));
+      return normR <= 1.0;
+    }
+
+    function getBlobBounds() {
+      var cx = cfg.w / 2, cy = cfg.h / 2;
+      var rx = cfg.w * 0.46, ry = cfg.h * 0.45;
+      var bumpAmp = 0.07, bumpFreq = 3;
+      return { cx: cx, cy: cy, rx: rx, ry: ry, bumpAmp: bumpAmp, bumpFreq: bumpFreq };
+    }
+
+    // ─── SUTHERLAND-HODGMAN POLYGON CLIP ────────────────────
+    function clipPolyByHalfPlane(poly, ax, ay, bx, by) {
+      // Clips poly to left side of directed edge (ax,ay)->(bx,by)
       var out = [];
-      for (var i = 0; i < pts.length; i++) {
-        var next = pts[(i + 1) % pts.length];
-        if (dist(pts[i], next) > 0.4) {
-          out.push(pts[i]);
+      var n = poly.length;
+      if (n === 0) return out;
+      for (var i = 0; i < n; i++) {
+        var c = poly[i], d = poly[(i+1)%n];
+        var cIn = (bx-ax)*(c.y-ay) - (by-ay)*(c.x-ax) >= 0;
+        var dIn = (bx-ax)*(d.y-ay) - (by-ay)*(d.x-ax) >= 0;
+        if (cIn) out.push(c);
+        if (cIn !== dIn) {
+          // Intersection
+          var t = ((ax-c.x)*(ay-by)-(ay-c.y)*(ax-bx)) / ((c.x-d.x)*(ay-by)-(c.y-d.y)*(ax-bx));
+          if (isFinite(t)) out.push({ x: c.x + t*(d.x-c.x), y: c.y + t*(d.y-c.y) });
         }
       }
       return out;
     }
 
-    function ensureClockwise(pts) {
-      if (polygonArea(pts) > 0) return pts.slice().reverse();
-      return pts;
+    function clipPolyToBlob(poly) {
+      var b = getBlobBounds();
+      var blobPts = getBlobPoints(b.cx, b.cy, b.rx, b.ry, b.bumpAmp, b.bumpFreq, 64);
+      var clipped = poly.slice();
+      for (var i = 0; i < blobPts.length; i++) {
+        if (clipped.length === 0) break;
+        var p1 = blobPts[i], p2 = blobPts[(i+1)%blobPts.length];
+        clipped = clipPolyByHalfPlane(clipped, p1.x, p1.y, p2.x, p2.y);
+      }
+      return clipped;
     }
 
-    function ensureCounterClockwise(pts) {
-      if (polygonArea(pts) < 0) return pts.slice().reverse();
-      return pts;
+    function clipPolyToRect(poly) {
+      var w = cfg.w, h = cfg.h;
+      var clipped = poly;
+      clipped = clipPolyByHalfPlane(clipped, 0,0, w,0);
+      clipped = clipPolyByHalfPlane(clipped, w,0, w,h);
+      clipped = clipPolyByHalfPlane(clipped, w,h, 0,h);
+      clipped = clipPolyByHalfPlane(clipped, 0,h, 0,0);
+      return clipped;
     }
 
-    // ─────────────────────────────────────────────────────────
-    // POISSON SEEDS & HYBRID GENERATION
-    // ─────────────────────────────────────────────────────────
-
-    function generatePoissonSeeds(count, w, h) {
-      var seeds = [];
-      var numSamples = 25;
-
+    // ─── SEED GENERATION ─────────────────────────────────────
+    function poissonSeeds(count, w, h) {
+      var seeds = [], k = 25;
       for (var i = 0; i < count; i++) {
-        var bestCand = null;
-        var maxMinDist = -1;
-
-        for (var s = 0; s < numSamples; s++) {
-          var cand = {
-            x: 18 + Math.random() * (w - 36),
-            y: 18 + Math.random() * (h - 36)
-          };
-
-          var minD = Math.min(cand.x, cand.y, w - cand.x, h - cand.y);
-          for (var k = 0; k < seeds.length; k++) {
-            var d = dist(cand, seeds[k]);
-            if (d < minD) minD = d;
-          }
-
-          if (minD > maxMinDist) {
-            maxMinDist = minD;
-            bestCand = cand;
-          }
+        var best = null, bmd = -1;
+        for (var s = 0; s < k; s++) {
+          var c = { x: 5 + Math.random()*(w-10), y: 5 + Math.random()*(h-10) };
+          var md = Math.min(c.x, c.y, w-c.x, h-c.y);
+          for (var j = 0; j < seeds.length; j++) { var d=dist(c,seeds[j]); if(d<md) md=d; }
+          if (md > bmd) { bmd = md; best = c; }
         }
-
-        if (bestCand) seeds.push(bestCand);
+        if (best) seeds.push(best);
       }
       return seeds;
     }
 
-    function generateHexSeeds(w, h, r) {
+    function hexSeeds(w, h, r) {
       var seeds = [];
-      var dx = r * Math.sqrt(3);
-      var dy = r * 1.5;
-      var cols = Math.ceil(w / dx) + 1;
-      var rows = Math.ceil(h / dy) + 1;
-
+      var dx = r * Math.sqrt(3), dy = r * 1.5;
+      var cols = Math.ceil(w/dx)+1, rows = Math.ceil(h/dy)+1;
       for (var row = 0; row < rows; row++) {
-        var xOff = (row % 2 !== 0) ? dx / 2 : 0;
-        var y = row * dy;
-
+        var xOff = (row%2!==0) ? dx/2 : 0;
         for (var col = 0; col < cols; col++) {
-          var x = col * dx + xOff;
-          if (x >= 0 && x <= w && y >= 0 && y <= h) {
-            seeds.push({ x: x, y: y });
-          }
+          var x = col*dx+xOff, y = row*dy;
+          if (x>=0&&x<=w&&y>=0&&y<=h) seeds.push({x:x, y:y});
         }
       }
       return seeds;
     }
 
-    function nearestHex(p, hexList) {
-      var best = hexList[0], bd = Infinity;
-      for (var i = 0; i < hexList.length; i++) {
-        var d = dist(p, hexList[i]);
-        if (d < bd) { bd = d; best = hexList[i]; }
-      }
-      return best;
-    }
+    // Density-gradient hybrid: large hex cells outside, tiny Voronoi in center
+    // density=0 → all uniform hex; density=1 → tiny packed center, large hex edge
+    function buildHybridSeeds() {
+      var w = cfg.w, h = cfg.h, n = cfg.seeds, dens = cfg.density;
+      var cx = w/2, cy = h/2;
+      var maxR = Math.min(w, h) * 0.5;
 
-    function generateHybridSeeds() {
-      var w = cfg.w, h = cfg.h, n = cfg.seeds, blend = cfg.blend;
+      // Generate base hex grid (sparse = outer scale)
       var area = w * h;
-      var hexR = Math.sqrt((2 * area) / (3 * Math.sqrt(3) * n));
+      var hexR = Math.sqrt((2*area) / (3*Math.sqrt(3)*n));
+      var hexList = hexSeeds(w, h, hexR);
 
-      var hexList = generateHexSeeds(w, h, hexR);
-      var poiList = generatePoissonSeeds(n, w, h);
-
-      var cx = w / 2, cy = h / 2;
-      var maxRadius = Math.min(w, h) * 0.5;
-      var innerRadius = maxRadius * (1.0 - blend) * 0.3;
-      var outerRadius = maxRadius * (1.0 - blend * 0.5);
+      // Filter to inside shape
+      var inShape = function(p) {
+        if (cfg.shape === 'blob') {
+          var b = getBlobBounds();
+          return pointInBlob(p, b.cx, b.cy, b.rx, b.ry, b.bumpAmp, b.bumpFreq);
+        }
+        return p.x >= 1 && p.x <= w-1 && p.y >= 1 && p.y <= h-1;
+      };
 
       var finalSeeds = [];
 
+      // Outer ring: keep hex seeds far from center
       for (var i = 0; i < hexList.length; i++) {
         var p = hexList[i];
-        var d = dist(p, { x: cx, y: cy });
-        var t = smoothstep(innerRadius, outerRadius, d);
-        if (t > 0.3) finalSeeds.push(p);
+        if (!inShape(p)) continue;
+        var d = dist(p, {x:cx, y:cy});
+        var norm = d / maxR;        // 0=center, 1=edge
+        var keepProb = smoothstep(0.0, 1.0 - dens * 0.5, norm);
+        if (Math.random() < keepProb) finalSeeds.push(p);
       }
 
-      for (var i = 0; i < poiList.length; i++) {
-        var p = poiList[i];
-        var d = dist(p, { x: cx, y: cy });
-        var t = smoothstep(innerRadius, outerRadius, d);
-        if (t < 0.8) {
-          var nh = nearestHex(p, hexList);
-          finalSeeds.push({
-            x: p.x + (nh.x - p.x) * t,
-            y: p.y + (nh.y - p.y) * t
-          });
+      // Inner Voronoi seeds: tiny Poisson packed toward center
+      var innerCount = Math.round(n * dens * 1.8);
+      var r2 = maxR * (1.0 - dens * 0.5);
+      var innerSeeds = [];
+      var k2 = 30;
+      for (var i = 0; i < innerCount; i++) {
+        var best = null, bmd = -1;
+        for (var s = 0; s < k2; s++) {
+          var angle = Math.random() * Math.PI * 2;
+          var radius = Math.random() * r2 * 0.9;
+          var c = { x: cx + radius*Math.cos(angle), y: cy + radius*Math.sin(angle) };
+          if (!inShape(c)) continue;
+          var md = dist(c, {x:cx,y:cy});
+          for (var j = 0; j < innerSeeds.length; j++) { var dd=dist(c,innerSeeds[j]); if(dd<md) md=dd; }
+          if (md > bmd) { bmd = md; best = c; }
         }
+        if (best) innerSeeds.push(best);
       }
 
+      // Blend: scale inner seeds to be denser (closer together)
+      var hexRInner = hexR * (1.0 - dens * 0.7);
+      for (var i = 0; i < innerSeeds.length; i++) {
+        finalSeeds.push(innerSeeds[i]);
+      }
+
+      if (finalSeeds.length < 4) finalSeeds = hexList.filter(inShape);
       return finalSeeds;
     }
 
-    // ─────────────────────────────────────────────────────────
-    // VORONOI CELL EXTRACTION
-    // ─────────────────────────────────────────────────────────
-
+    // ─── VORONOI CELLS ───────────────────────────────────────
     function computeVoronoiCells(seeds) {
-      var bbox = { xl: 0, xr: cfg.w, yt: 0, yb: cfg.h };
+      var margin = 5;
+      var bbox = { xl: -margin, xr: cfg.w+margin, yt: -margin, yb: cfg.h+margin };
       var voronoi = new Voronoi();
       var diagram = voronoi.compute(seeds, bbox);
-
       var cells = [];
-
       for (var i = 0; i < diagram.cells.length; i++) {
         var c = diagram.cells[i];
         if (!c || !c.halfedges || c.halfedges.length < 3) continue;
-
-        var verts = [];
-        var ok = true;
-
+        var verts = []; var ok = true;
         for (var j = 0; j < c.halfedges.length; j++) {
-          var he = c.halfedges[j];
-          var p = he.getStartpoint();
-          if (!p || isNaN(p.x) || isNaN(p.y)) { ok = false; break; }
-          verts.push({ x: p.x, y: p.y });
+          var p = c.halfedges[j].getStartpoint();
+          if (!p || isNaN(p.x) || isNaN(p.y)) { ok=false; break; }
+          verts.push({x:p.x, y:p.y});
         }
-
         if (!ok || verts.length < 3) continue;
         cells.push(verts);
       }
-
       return cells;
     }
 
-    // ─────────────────────────────────────────────────────────
-    // PARALLEL EDGE RETRACTION
-    // ─────────────────────────────────────────────────────────
-
+    // ─── POLYGON OFFSET / RETRACT ────────────────────────────
     function offsetSeg(v1, v2, d) {
-      var dx = v2.x - v1.x, dy = v2.y - v1.y;
-      var len = Math.sqrt(dx * dx + dy * dy);
-      if (len < 1e-7) return { v1: { x: v1.x, y: v1.y }, v2: { x: v2.x, y: v2.y } };
-      var nx = -dy / len * d;
-      var ny = dx / len * d;
-      return { v1: { x: v1.x + nx, y: v1.y + ny }, v2: { x: v2.x + nx, y: v2.y + ny } };
+      var dx=v2.x-v1.x, dy=v2.y-v1.y, len=Math.sqrt(dx*dx+dy*dy);
+      if(len<1e-7) return {v1:{x:v1.x,y:v1.y},v2:{x:v2.x,y:v2.y}};
+      var nx=-dy/len*d, ny=dx/len*d;
+      return {v1:{x:v1.x+nx,y:v1.y+ny},v2:{x:v2.x+nx,y:v2.y+ny}};
     }
-
-    function lineIntersect(s1, s2) {
-      var x1 = s1.v1.x, y1 = s1.v1.y, x2 = s1.v2.x, y2 = s1.v2.y;
-      var x3 = s2.v1.x, y3 = s2.v1.y, x4 = s2.v2.x, y4 = s2.v2.y;
-      var denom = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4);
-      if (Math.abs(denom) < 1e-8) return null;
-      var px = ((x1 * y2 - y1 * x2) * (x3 - x4) - (x1 - x2) * (x3 * y4 - y3 * x4)) / denom;
-      var py = ((x1 * y2 - y1 * x2) * (y3 - y4) - (y1 - y2) * (x3 * y4 - y3 * x4)) / denom;
-      return { x: px, y: py };
+    function lineIntersect(s1,s2){
+      var x1=s1.v1.x,y1=s1.v1.y,x2=s1.v2.x,y2=s1.v2.y;
+      var x3=s2.v1.x,y3=s2.v1.y,x4=s2.v2.x,y4=s2.v2.y;
+      var denom=(x1-x2)*(y3-y4)-(y1-y2)*(x3-x4);
+      if(Math.abs(denom)<1e-8) return null;
+      var px=((x1*y2-y1*x2)*(x3-x4)-(x1-x2)*(x3*y4-y3*x4))/denom;
+      var py=((x1*y2-y1*x2)*(y3-y4)-(y1-y2)*(x3*y4-y3*x4))/denom;
+      return {x:px,y:py};
     }
-
     function retractPolygon(verts, d) {
       if (verts.length < 3 || d <= 0) return verts;
-      var n = verts.length;
-      var segs = [];
-
-      for (var i = 0; i < n; i++) {
-        segs.push(offsetSeg(verts[i], verts[(i + 1) % n], d));
-      }
-
+      var n = verts.length, segs = [];
+      for (var i=0;i<n;i++) segs.push(offsetSeg(verts[i],verts[(i+1)%n],d));
       var out = [];
-      var borderMargin = Math.max(2.0, d);
-      for (var i = 0; i < n; i++) {
-        var pt = lineIntersect(segs[(i + n - 1) % n], segs[i]) || segs[i].v1;
-        out.push({
-          x: Math.max(borderMargin, Math.min(cfg.w - borderMargin, pt.x)),
-          y: Math.max(borderMargin, Math.min(cfg.h - borderMargin, pt.y))
-        });
+      for (var i=0;i<n;i++) {
+        var pt = lineIntersect(segs[(i+n-1)%n], segs[i]) || segs[i].v1;
+        out.push({x:pt.x,y:pt.y});
       }
-      return cleanPolygon(out);
+      return cleanPoly(out);
+    }
+    function applyFillets(verts) {
+      if (verts.length < 3) return verts;
+      var n=verts.length, out=[], f=0.25;
+      for (var i=0;i<n;i++) {
+        var prev=verts[(i+n-1)%n], curr=verts[i], next=verts[(i+1)%n];
+        var p1={x:curr.x+(prev.x-curr.x)*f, y:curr.y+(prev.y-curr.y)*f};
+        var p2={x:curr.x+(next.x-curr.x)*f, y:curr.y+(next.y-curr.y)*f};
+        for(var s=0;s<=3;s++){
+          var t=s/3, u=1-t;
+          out.push({x:u*u*p1.x+2*u*t*curr.x+t*t*p2.x, y:u*u*p1.y+2*u*t*curr.y+t*t*p2.y});
+        }
+      }
+      return cleanPoly(out);
     }
 
-    // ─────────────────────────────────────────────────────────
-    // CORNER FILLETS (SMOOTH ROUNDED CORNERS)
-    // ─────────────────────────────────────────────────────────
+    // ─── 2D SVG PREVIEW ─────────────────────────────────────
+    function updateSVG2D() {
+      var svgEl = document.getElementById('svg2d');
+      var pane = document.getElementById('pane-2d');
+      var pw = pane.clientWidth || 400;
+      var ph = pane.clientHeight || 300;
+      
+      var scale = Math.min(pw / (cfg.w + 20), ph / (cfg.h + 20));
+      var offX = (pw - cfg.w * scale) / 2;
+      var offY = (ph - cfg.h * scale) / 2;
 
-    function applyCornerFillets(verts) {
-      if (verts.length < 3) return verts;
-      var n = verts.length;
-      var out = [];
-      var factor = 0.25;
+      function toSvgX(x) { return offX + x * scale; }
+      function toSvgY(y) { return offY + y * scale; }
 
-      for (var i = 0; i < n; i++) {
-        var prev = verts[(i + n - 1) % n];
-        var curr = verts[i];
-        var next = verts[(i + 1) % n];
+      var parts = [];
 
-        var p1 = { x: curr.x + (prev.x - curr.x) * factor, y: curr.y + (prev.y - curr.y) * factor };
-        var p2 = { x: curr.x + (next.x - curr.x) * factor, y: curr.y + (next.y - curr.y) * factor };
+      // Background
+      parts.push('<rect width="' + pw + '" height="' + ph + '" fill="#ffffff"/>');
 
-        for (var step = 0; step <= 3; step++) {
-          var t = step / 3;
-          var u = 1 - t;
-          out.push({
-            x: u * u * p1.x + 2 * u * t * curr.x + t * t * p2.x,
-            y: u * u * p1.y + 2 * u * t * curr.y + t * t * p2.y
-          });
+      // Draw shape outline
+      if (cfg.shape === 'blob') {
+        var b = getBlobBounds();
+        var bpts = getBlobPoints(b.cx, b.cy, b.rx, b.ry, b.bumpAmp, b.bumpFreq, 64);
+        var d = 'M ' + toSvgX(bpts[0].x).toFixed(1) + ' ' + toSvgY(bpts[0].y).toFixed(1);
+        for (var i = 1; i < bpts.length; i++) {
+          d += ' L ' + toSvgX(bpts[i].x).toFixed(1) + ' ' + toSvgY(bpts[i].y).toFixed(1);
+        }
+        d += ' Z';
+        parts.push('<path d="' + d + '" fill="#f9f9f9" stroke="#bbb" stroke-width="1.5"/>');
+      } else {
+        parts.push('<rect x="' + toSvgX(0) + '" y="' + toSvgY(0) + '" width="' + (cfg.w*scale).toFixed(1) + '" height="' + (cfg.h*scale).toFixed(1) + '" fill="#f9f9f9" stroke="#bbb" stroke-width="1.5"/>');
+      }
+
+      // Draw cells
+      for (var i = 0; i < clippedPolygons.length; i++) {
+        var poly = clippedPolygons[i];
+        if (!poly || poly.length < 3) continue;
+        var pd = 'M ' + toSvgX(poly[0].x).toFixed(1) + ' ' + toSvgY(poly[0].y).toFixed(1);
+        for (var j = 1; j < poly.length; j++) {
+          pd += ' L ' + toSvgX(poly[j].x).toFixed(1) + ' ' + toSvgY(poly[j].y).toFixed(1);
+        }
+        pd += ' Z';
+        parts.push('<path d="' + pd + '" fill="rgba(240,248,255,0.8)" stroke="#333" stroke-width="' + (0.8).toFixed(1) + '" stroke-linejoin="round"/>');
+      }
+
+      // Draw seed dots
+      if (cfg.showSeeds) {
+        for (var i = 0; i < currentSeeds.length; i++) {
+          var s = currentSeeds[i];
+          var r = scale < 1 ? 2.0 : 2.5;
+          parts.push('<circle cx="' + toSvgX(s.x).toFixed(1) + '" cy="' + toSvgY(s.y).toFixed(1) + '" r="' + r + '" fill="#111"/>');
         }
       }
 
-      return cleanPolygon(out);
+      svgEl.setAttribute('viewBox', '0 0 ' + pw + ' ' + ph);
+      svgEl.setAttribute('width', pw);
+      svgEl.setAttribute('height', ph);
+      svgEl.innerHTML = parts.join('\n');
     }
 
-    // ─────────────────────────────────────────────────────────
-    // SEED POINT SPHERES VISUALIZER
-    // ─────────────────────────────────────────────────────────
-
+    // ─── SEED SPHERES ────────────────────────────────────────
     function updateSeedSpheres() {
-      // Clear old spheres
       while (seedSpheresGroup.children.length > 0) {
-        var child = seedSpheresGroup.children.pop();
-        if (child.geometry) child.geometry.dispose();
-        if (child.material) child.material.dispose();
+        var c = seedSpheresGroup.children.pop();
+        if (c.geometry) c.geometry.dispose();
+        if (c.material) c.material.dispose();
       }
-
       if (!cfg.showSeeds) return;
-
-      var sphereGeom = new THREE.SphereGeometry(2.2, 16, 16);
-      var sphereMat = new THREE.MeshStandardMaterial({
-        color: 0xFF5252,
-        roughness: 0.2,
-        metalness: 0.2,
-        emissive: 0x330000
-      });
-
-      var topY = cfg.depth / 2.0 + 1.2;
-
+      var sg = new THREE.SphereGeometry(2.0, 12, 12);
+      var sm = new THREE.MeshStandardMaterial({ color: 0xFF3D00, roughness: 0.3, metalness: 0.2 });
+      var topY = cfg.depth / 2.0 + 1.0;
       for (var i = 0; i < currentSeeds.length; i++) {
         var s = currentSeeds[i];
-        var mesh = new THREE.Mesh(sphereGeom, sphereMat);
-        mesh.position.set(s.x - cfg.w / 2, topY, s.y - cfg.h / 2);
+        var mesh = new THREE.Mesh(sg, sm);
+        mesh.position.set(s.x - cfg.w/2, topY, s.y - cfg.h/2);
         mesh.userData = { seedIndex: i };
         seedSpheresGroup.add(mesh);
       }
     }
 
-    // ─────────────────────────────────────────────────────────
-    // 3D EXTRUSION BUILDER (WATERTIGHT & BUG-FREE)
-    // ─────────────────────────────────────────────────────────
-
+    // ─── 3D BUILDER ─────────────────────────────────────────
     function build3D(polys) {
       if (currentMesh) {
         scene.remove(currentMesh);
@@ -828,45 +799,42 @@
         if (currentMesh.material) currentMesh.material.dispose();
         currentMesh = null;
       }
-
       if (!polys || polys.length === 0) return;
 
-      var w = cfg.w, h = cfg.h, depth = cfg.depth, mode = cfg.mode;
+      var w = cfg.w, h = cfg.h, depth = cfg.depth;
       var color = new THREE.Color(cfg.color);
-
       var geoms = [];
 
-      if (mode === 'cells') {
+      if (cfg.mode === 'cells') {
         for (var i = 0; i < polys.length; i++) {
-          var poly = ensureCounterClockwise(polys[i]);
+          var poly = ensureCCW(polys[i]);
           if (poly.length < 3) continue;
-
           var s = new THREE.Shape();
           s.moveTo(poly[0].x, poly[0].y);
           for (var j = 1; j < poly.length; j++) s.lineTo(poly[j].x, poly[j].y);
           s.closePath();
-
           geoms.push(new THREE.ExtrudeGeometry(s, { depth: depth, bevelEnabled: false }));
         }
       } else {
-        var outerBox = [
-          { x: 0, y: 0 },
-          { x: w, y: 0 },
-          { x: w, y: h },
-          { x: 0, y: h }
-        ];
-        outerBox = ensureCounterClockwise(outerBox);
+        // Outer shape
+        var outerPts;
+        if (cfg.shape === 'blob') {
+          var b = getBlobBounds();
+          outerPts = getBlobPoints(b.cx, b.cy, b.rx, b.ry, b.bumpAmp, b.bumpFreq, 64);
+          outerPts = ensureCCW(outerPts);
+        } else {
+          outerPts = ensureCCW([{x:0,y:0},{x:w,y:0},{x:w,y:h},{x:0,y:h}]);
+        }
 
         var outerShape = new THREE.Shape();
-        outerShape.moveTo(outerBox[0].x, outerBox[0].y);
-        for (var j = 1; j < outerBox.length; j++) outerShape.lineTo(outerBox[j].x, outerBox[j].y);
+        outerShape.moveTo(outerPts[0].x, outerPts[0].y);
+        for (var j = 1; j < outerPts.length; j++) outerShape.lineTo(outerPts[j].x, outerPts[j].y);
         outerShape.closePath();
 
         for (var i = 0; i < polys.length; i++) {
-          var poly = cleanPolygon(polys[i]);
-          poly = ensureClockwise(poly);
+          var poly = cleanPoly(polys[i]);
           if (poly.length < 3) continue;
-
+          poly = ensureCW(poly);
           var hole = new THREE.Path();
           hole.moveTo(poly[0].x, poly[0].y);
           for (var j = 1; j < poly.length; j++) hole.lineTo(poly[j].x, poly[j].y);
@@ -883,389 +851,286 @@
       if (geoms.length === 1) {
         geom = geoms[0];
       } else {
-        var pos = [], norm = [];
+        var pos = [];
         for (var i = 0; i < geoms.length; i++) {
           var p = geoms[i].attributes.position.array;
-          var n = geoms[i].attributes.normal ? geoms[i].attributes.normal.array : null;
           for (var k = 0; k < p.length; k++) pos.push(p[k]);
-          if (n) { for (var k = 0; k < n.length; k++) norm.push(n[k]); }
         }
-        var merged = new THREE.BufferGeometry();
-        merged.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-        if (norm.length > 0) merged.setAttribute('normal', new THREE.Float32BufferAttribute(norm, 3));
-        geom = merged;
+        geom = new THREE.BufferGeometry();
+        geom.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
       }
 
       geom.computeBoundingBox();
       var box = geom.boundingBox;
-      var cx = (box.max.x + box.min.x) / 2;
-      var cy = (box.max.y + box.min.y) / 2;
-      var cz = (box.max.z + box.min.z) / 2;
-      geom.translate(-cx, -cy, -cz);
+      geom.translate(-(box.max.x+box.min.x)/2, -(box.max.y+box.min.y)/2, -(box.max.z+box.min.z)/2);
 
-      var mat = new THREE.MeshStandardMaterial({
-        color: color,
-        roughness: 0.35,
-        metalness: 0.05,
-        side: THREE.DoubleSide
-      });
-
+      var mat = new THREE.MeshStandardMaterial({ color: color, roughness: 0.35, metalness: 0.05, side: THREE.DoubleSide });
       currentMesh = new THREE.Mesh(geom, mat);
       currentMesh.rotation.x = -Math.PI / 2;
-      currentMesh.castShadow = true;
-      currentMesh.receiveShadow = true;
+      currentMesh.castShadow = true; currentMesh.receiveShadow = true;
       scene.add(currentMesh);
-
       updateSeedSpheres();
     }
 
-    // ─────────────────────────────────────────────────────────
-    // REBUILD CONTROLLER
-    // ─────────────────────────────────────────────────────────
-
+    // ─── REBUILD ─────────────────────────────────────────────
     function setStatus(msg, cls) {
       var el = document.getElementById('status');
       el.textContent = msg;
       el.className = 'status-bar' + (cls ? ' ' + cls : '');
     }
 
-    function generateAndBuildSeeds() {
-      currentSeeds = generateHybridSeeds();
-      rebuildFromCurrentSeeds();
+    function rebuildAll() {
+      currentSeeds = buildHybridSeeds();
+      rebuildFromSeeds();
     }
 
-    function rebuildFromCurrentSeeds() {
-      setStatus('Generating 3D model…');
+    function rebuildFromSeeds() {
+      setStatus('Generating…');
       setTimeout(function() {
         try {
           var rawCells = computeVoronoiCells(currentSeeds);
-
-          var halfGap = cfg.spacing / 2.0;
+          var half = cfg.spacing / 2;
           var polys = [];
 
           for (var i = 0; i < rawCells.length; i++) {
-            var ccwCell = ensureCounterClockwise(rawCells[i]);
-            var retracted = retractPolygon(ccwCell, halfGap);
+            var cell = ensureCCW(rawCells[i]);
 
-            if (retracted.length >= 3 && Math.abs(polygonArea(retracted)) >= 20) {
-              if (cfg.curve === 'fillet') retracted = applyCornerFillets(retracted);
-              polys.push(retracted);
-            }
+            // Clip to shape
+            var clipped = cfg.shape === 'blob' ? clipPolyToBlob(cell) : clipPolyToRect(cell);
+            if (!clipped || clipped.length < 3) continue;
+            clipped = ensureCCW(clipped);
+
+            // Retract for wall thickness
+            var ret = retractPolygon(clipped, half);
+            if (!ret || ret.length < 3 || Math.abs(polygonArea(ret)) < 15) continue;
+            if (cfg.curve === 'fillet') ret = applyFillets(ret);
+            polys.push(ret);
           }
 
           cellPolygons = polys;
+          clippedPolygons = polys;
           build3D(polys);
+          updateSVG2D();
 
-          document.getElementById('v-seeds').textContent = currentSeeds.length;
-          setStatus('✓ Generated ' + polys.length + ' clean cells (' + currentSeeds.length + ' seeds)', 'ok');
-        } catch (e) {
-          setStatus('Error: ' + e.message, 'err');
-          console.error(e);
+          setStatus('✓ ' + polys.length + ' cells · ' + currentSeeds.length + ' seeds', 'ok');
+        } catch(e) {
+          setStatus('Error: ' + e.message, 'err'); console.error(e);
         }
       }, 20);
     }
 
-    // ─────────────────────────────────────────────────────────
-    // INTERACTIVE SEED RAYCASTING & MOUSE EDITING
-    // ─────────────────────────────────────────────────────────
-
+    // ─── RAYCASTING & SEED EDITING ───────────────────────────
     var raycaster = new THREE.Raycaster();
-    var mouse = new THREE.Vector2();
-    var isDraggingSeed = false;
-    var draggedSeedIndex = -1;
-
-    // Ground plane corresponding to top surface of panel
+    var mouse2 = new THREE.Vector2();
+    var isDragging = false;
+    var dragIdx = -1;
     var planePlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -cfg.depth / 2.0);
 
-    function getPlaneIntersection(e) {
+    function getPlaneHit(e) {
       var rect = canvas.getBoundingClientRect();
-      mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
-      mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
-
-      raycaster.setFromCamera(mouse, camera);
-      var target = new THREE.Vector3();
-      if (raycaster.ray.intersectPlane(planePlane, target)) {
-        return {
-          x: target.x + cfg.w / 2,
-          y: target.z + cfg.h / 2
-        };
+      mouse2.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+      mouse2.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+      raycaster.setFromCamera(mouse2, camera);
+      var t = new THREE.Vector3();
+      if (raycaster.ray.intersectPlane(planePlane, t)) {
+        return { x: t.x + cfg.w/2, y: t.z + cfg.h/2 };
       }
       return null;
     }
 
-    function getIntersectedSeed(e) {
+    function getSeedHit(e) {
       var rect = canvas.getBoundingClientRect();
-      mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
-      mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
-
-      raycaster.setFromCamera(mouse, camera);
-      var intersects = raycaster.intersectObjects(seedSpheresGroup.children);
-      if (intersects.length > 0) {
-        return intersects[0].object.userData.seedIndex;
-      }
-      return -1;
+      mouse2.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+      mouse2.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+      raycaster.setFromCamera(mouse2, camera);
+      var hits = raycaster.intersectObjects(seedSpheresGroup.children);
+      return hits.length > 0 ? hits[0].object.userData.seedIndex : -1;
     }
 
     canvas.addEventListener('pointerdown', function(e) {
       if (cfg.pointerMode === 'navigate') return;
-
-      var seedIdx = getIntersectedSeed(e);
-
-      if (cfg.pointerMode === 'delete') {
-        if (seedIdx !== -1) {
-          currentSeeds.splice(seedIdx, 1);
-          rebuildFromCurrentSeeds();
-        }
+      var idx = getSeedHit(e);
+      if (cfg.pointerMode === 'delete' && idx !== -1) {
+        currentSeeds.splice(idx, 1); rebuildFromSeeds();
       } else if (cfg.pointerMode === 'add') {
-        var pt = getPlaneIntersection(e);
-        if (pt && pt.x >= 5 && pt.x <= cfg.w - 5 && pt.y >= 5 && pt.y <= cfg.h - 5) {
-          currentSeeds.push(pt);
-          rebuildFromCurrentSeeds();
+        var pt = getPlaneHit(e);
+        if (pt && pt.x >= 2 && pt.x <= cfg.w-2 && pt.y >= 2 && pt.y <= cfg.h-2) {
+          currentSeeds.push(pt); rebuildFromSeeds();
         }
-      } else if (cfg.pointerMode === 'move') {
-        if (seedIdx !== -1) {
-          isDraggingSeed = true;
-          draggedSeedIndex = seedIdx;
-          controls.enabled = false; // Disable orbit camera while dragging
-        }
+      } else if (cfg.pointerMode === 'move' && idx !== -1) {
+        isDragging = true; dragIdx = idx; controls.enabled = false;
       }
     });
 
     canvas.addEventListener('pointermove', function(e) {
-      if (isDraggingSeed && draggedSeedIndex !== -1) {
-        var pt = getPlaneIntersection(e);
+      if (isDragging && dragIdx !== -1) {
+        var pt = getPlaneHit(e);
         if (pt) {
-          currentSeeds[draggedSeedIndex] = {
-            x: Math.max(2, Math.min(cfg.w - 2, pt.x)),
-            y: Math.max(2, Math.min(cfg.h - 2, pt.y))
-          };
-          rebuildFromCurrentSeeds();
+          currentSeeds[dragIdx] = { x: Math.max(2, Math.min(cfg.w-2, pt.x)), y: Math.max(2, Math.min(cfg.h-2, pt.y)) };
+          rebuildFromSeeds();
         }
       }
     });
 
     window.addEventListener('pointerup', function() {
-      if (isDraggingSeed) {
-        isDraggingSeed = false;
-        draggedSeedIndex = -1;
-        if (cfg.pointerMode === 'navigate') controls.enabled = true;
-      }
+      if (isDragging) { isDragging = false; dragIdx = -1; controls.enabled = true; }
     });
 
-    // ─────────────────────────────────────────────────────────
-    // JSON SEED IMPORT & EXPORT
-    // ─────────────────────────────────────────────────────────
-
-    function exportSeedsJSON() {
-      if (!currentSeeds.length) { setStatus('No seeds to export', 'err'); return; }
-      var json = JSON.stringify(currentSeeds, null, 2);
-      var blob = new Blob([json], { type: 'application/json' });
+    // ─── JSON SEED EXPORT / IMPORT ───────────────────────────
+    document.getElementById('btn-export-seeds').addEventListener('click', function() {
+      if (!currentSeeds.length) { setStatus('No seeds', 'err'); return; }
+      var blob = new Blob([JSON.stringify(currentSeeds, null, 2)], { type: 'application/json' });
       var a = document.createElement('a');
       a.href = URL.createObjectURL(blob);
-      a.download = 'voronoi_seeds.json';
-      a.click();
-      URL.revokeObjectURL(a.href);
-      setStatus('Seeds exported as JSON!', 'ok');
-    }
-
-    function importSeedsJSON(e) {
-      var file = e.target.files[0];
-      if (!file) return;
-      var reader = new FileReader();
-      reader.onload = function(evt) {
-        try {
-          var parsed = JSON.parse(evt.target.result);
-          if (Array.isArray(parsed) && parsed.length > 0) {
-            currentSeeds = parsed.map(function(p) {
-              return { x: parseFloat(p.x || 0), y: parseFloat(p.y || 0) };
-            });
-            rebuildFromCurrentSeeds();
-            setStatus('Imported ' + currentSeeds.length + ' seeds from JSON!', 'ok');
-          } else {
-            setStatus('Invalid seed JSON file', 'err');
-          }
-        } catch (err) {
-          setStatus('JSON parse error: ' + err.message, 'err');
-        }
-      };
-      reader.readAsText(file);
-    }
-
-    // ─────────────────────────────────────────────────────────
-    // STL & SVG EXPORTERS
-    // ─────────────────────────────────────────────────────────
-
-    function exportSTL() {
-      if (!currentMesh) { setStatus('Nothing to export', 'err'); return; }
-      setStatus('Exporting binary STL…');
-      setTimeout(function() {
-        try {
-          var geom = currentMesh.geometry;
-          var pos = geom.attributes.position;
-          var triCount = pos.count / 3;
-
-          var buf = new ArrayBuffer(84 + triCount * 50);
-          var view = new DataView(buf);
-          var offset = 0;
-
-          for (var i = 0; i < 80; i++) view.setUint8(offset++, 0);
-          view.setUint32(offset, triCount, true); offset += 4;
-
-          for (var i = 0; i < triCount; i++) {
-            var i3 = i * 3;
-            var ax = pos.getX(i3), ay = pos.getY(i3), az = pos.getZ(i3);
-            var bx = pos.getX(i3 + 1), by = pos.getY(i3 + 1), bz = pos.getZ(i3 + 1);
-            var cx = pos.getX(i3 + 2), cy = pos.getY(i3 + 2), cz = pos.getZ(i3 + 2);
-
-            view.setFloat32(offset, 0, true); offset += 4;
-            view.setFloat32(offset, 0, true); offset += 4;
-            view.setFloat32(offset, 1, true); offset += 4;
-
-            view.setFloat32(offset, ax, true); offset += 4;
-            view.setFloat32(offset, ay, true); offset += 4;
-            view.setFloat32(offset, az, true); offset += 4;
-
-            view.setFloat32(offset, bx, true); offset += 4;
-            view.setFloat32(offset, by, true); offset += 4;
-            view.setFloat32(offset, bz, true); offset += 4;
-
-            view.setFloat32(offset, cx, true); offset += 4;
-            view.setFloat32(offset, cy, true); offset += 4;
-            view.setFloat32(offset, cz, true); offset += 4;
-
-            view.setUint16(offset, 0, true); offset += 2;
-          }
-
-          var blob = new Blob([buf], { type: 'application/octet-stream' });
-          var a = document.createElement('a');
-          a.href = URL.createObjectURL(blob);
-          a.download = 'voronoi_honeycomb_' + cfg.mode + '.stl';
-          a.click();
-          URL.revokeObjectURL(a.href);
-          setStatus('STL exported successfully!', 'ok');
-        } catch (e) {
-          setStatus('Export error: ' + e.message, 'err');
-        }
-      }, 10);
-    }
-
-    function exportSVG() {
-      if (!cellPolygons.length) { setStatus('No cells to export', 'err'); return; }
-      var paths = '';
-      for (var i = 0; i < cellPolygons.length; i++) {
-        var p = cellPolygons[i];
-        if (p.length < 3) continue;
-        var d = 'M ' + p[0].x.toFixed(2) + ' ' + p[0].y.toFixed(2);
-        for (var j = 1; j < p.length; j++) d += ' L ' + p[j].x.toFixed(2) + ' ' + p[j].y.toFixed(2);
-        d += ' Z';
-        paths += '  <path d="' + d + '" fill="#4285F4" fill-opacity="0.18" stroke="#1A73E8" stroke-width="1.5"/>\n';
-      }
-
-      var svg = '<?xml version="1.0" encoding="UTF-8"?>\n<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' + cfg.w + ' ' + cfg.h + '" width="' + cfg.w + 'mm" height="' + cfg.h + 'mm">\n  <rect width="' + cfg.w + '" height="' + cfg.h + '" fill="none" stroke="#333" stroke-width="2"/>\n' + paths + '</svg>';
-      var blob = new Blob([svg], { type: 'image/svg+xml;charset=utf-8' });
-      var a = document.createElement('a');
-      a.href = URL.createObjectURL(blob);
-      a.download = 'voronoi_honeycomb.svg';
-      a.click();
-      URL.revokeObjectURL(a.href);
-      setStatus('SVG exported successfully!', 'ok');
-    }
-
-    // ─────────────────────────────────────────────────────────
-    // MOBILE DRAWER & UI BINDINGS
-    // ─────────────────────────────────────────────────────────
-
-    var sidebar = document.getElementById('sidebar');
-    var backdrop = document.getElementById('backdrop');
-    var btnToggleMenu = document.getElementById('btn-toggle-menu');
-    var btnCloseSidebar = document.getElementById('btn-close-sidebar');
-
-    function openSidebar() {
-      sidebar.classList.add('open');
-      backdrop.classList.add('active');
-    }
-    function closeSidebar() {
-      sidebar.classList.remove('open');
-      backdrop.classList.remove('active');
-    }
-
-    btnToggleMenu.addEventListener('click', openSidebar);
-    btnCloseSidebar.addEventListener('click', closeSidebar);
-    backdrop.addEventListener('click', closeSidebar);
-
-    function bind(sliderId, valId, cfgKey, fmt) {
-      var sl = document.getElementById(sliderId), vl = document.getElementById(valId);
-      if (!sl) return;
-      sl.addEventListener('input', function() {
-        var v = parseFloat(sl.value);
-        cfg[cfgKey] = v;
-        if (vl) vl.textContent = fmt(v);
-        if (cfgKey === 'seeds') {
-          generateAndBuildSeeds();
-        } else {
-          rebuildFromCurrentSeeds();
-        }
-      });
-    }
-
-    bind('s-seeds', 'v-seeds', 'seeds', function(v) { return Math.round(v); });
-    bind('s-blend', 'v-blend', 'blend', function(v) { return Math.round(v * 100) + '%'; });
-    bind('s-spacing', 'v-spacing', 'spacing', function(v) { return v.toFixed(1) + ' mm'; });
-    bind('s-depth', 'v-depth', 'depth', function(v) { return Math.round(v) + ' mm'; });
-    bind('s-w', 'v-w', 'w', function(v) { return Math.round(v) + ' mm'; });
-    bind('s-h', 'v-h', 'h', function(v) { return Math.round(v) + ' mm'; });
-
-    function makeSeg(groupId, cfgKey) {
-      var btns = document.querySelectorAll('#' + groupId + ' .seg-btn');
-      btns.forEach(function(btn) {
-        btn.addEventListener('click', function() {
-          btns.forEach(function(b) { b.classList.remove('active'); });
-          btn.classList.add('active');
-          cfg[cfgKey] = btn.getAttribute('data-v');
-          
-          if (cfgKey === 'pointerMode') {
-            var modeLabels = {
-              'navigate': '📍 Mode: 3D View',
-              'add': '➕ Mode: Click to Add Seed',
-              'move': '✋ Mode: Drag Seed Sphere',
-              'delete': '❌ Mode: Click to Remove Seed'
-            };
-            document.getElementById('badge-pointer-mode').textContent = modeLabels[cfg.pointerMode] || '📍 Mode: 3D View';
-            controls.enabled = (cfg.pointerMode === 'navigate');
-          } else {
-            rebuildFromCurrentSeeds();
-          }
-        });
-      });
-    }
-    makeSeg('seg-mouse-mode', 'pointerMode');
-    makeSeg('seg-mode', 'mode');
-    makeSeg('seg-curve', 'curve');
-
-    document.getElementById('chk-show-seeds').addEventListener('change', function() {
-      cfg.showSeeds = this.checked;
-      updateSeedSpheres();
+      a.download = 'voronoi_seeds.json'; a.click(); URL.revokeObjectURL(a.href);
+      setStatus('Seeds exported!', 'ok');
     });
 
-    document.getElementById('inp-color').addEventListener('input', function() {
-      cfg.color = this.value;
-      if (currentMesh && currentMesh.material) currentMesh.material.color.set(cfg.color);
-    });
-
-    document.getElementById('btn-rand').addEventListener('click', generateAndBuildSeeds);
-    document.getElementById('btn-reset').addEventListener('click', resetCamera);
-    document.getElementById('btn-stl').addEventListener('click', exportSTL);
-    document.getElementById('btn-svg').addEventListener('click', exportSVG);
-
-    document.getElementById('btn-export-seeds').addEventListener('click', exportSeedsJSON);
     document.getElementById('btn-import-seeds').addEventListener('click', function() {
       document.getElementById('inp-file-seeds').click();
     });
-    document.getElementById('inp-file-seeds').addEventListener('change', importSeedsJSON);
 
-    // INITIALIZATION
+    document.getElementById('inp-file-seeds').addEventListener('change', function(e) {
+      var file = e.target.files[0]; if (!file) return;
+      var reader = new FileReader();
+      reader.onload = function(ev) {
+        try {
+          var parsed = JSON.parse(ev.target.result);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            currentSeeds = parsed.map(function(p){ return {x:parseFloat(p.x||0),y:parseFloat(p.y||0)}; });
+            rebuildFromSeeds();
+            setStatus('Imported ' + currentSeeds.length + ' seeds!', 'ok');
+          } else { setStatus('Invalid JSON', 'err'); }
+        } catch(err) { setStatus('Parse error', 'err'); }
+      };
+      reader.readAsText(file);
+    });
+
+    // ─── STL EXPORT ──────────────────────────────────────────
+    document.getElementById('btn-stl').addEventListener('click', function() {
+      if (!currentMesh) { setStatus('Nothing to export', 'err'); return; }
+      setStatus('Exporting STL…');
+      setTimeout(function() {
+        try {
+          var geom = currentMesh.geometry, pos = geom.attributes.position;
+          var tc = pos.count / 3;
+          var buf = new ArrayBuffer(84 + tc * 50);
+          var view = new DataView(buf);
+          var off = 0;
+          for (var i=0;i<80;i++) view.setUint8(off++, 0);
+          view.setUint32(off, tc, true); off += 4;
+          for (var i = 0; i < tc; i++) {
+            var i3 = i*3;
+            view.setFloat32(off,0,true);off+=4; view.setFloat32(off,0,true);off+=4; view.setFloat32(off,1,true);off+=4;
+            for (var v = 0; v < 3; v++) {
+              view.setFloat32(off,pos.getX(i3+v),true);off+=4;
+              view.setFloat32(off,pos.getY(i3+v),true);off+=4;
+              view.setFloat32(off,pos.getZ(i3+v),true);off+=4;
+            }
+            view.setUint16(off,0,true);off+=2;
+          }
+          var a = document.createElement('a');
+          a.href = URL.createObjectURL(new Blob([buf], {type:'application/octet-stream'}));
+          a.download = 'voronoi_' + cfg.shape + '_' + cfg.mode + '.stl'; a.click();
+          setStatus('STL exported!', 'ok');
+        } catch(e) { setStatus('Export error: '+e.message,'err'); }
+      }, 10);
+    });
+
+    // ─── SVG EXPORT ──────────────────────────────────────────
+    document.getElementById('btn-svg').addEventListener('click', function() {
+      if (!cellPolygons.length) { setStatus('No cells', 'err'); return; }
+      var paths = '';
+      for (var i=0;i<cellPolygons.length;i++) {
+        var p = cellPolygons[i]; if (!p||p.length<3) continue;
+        var d = 'M '+p[0].x.toFixed(2)+' '+p[0].y.toFixed(2);
+        for (var j=1;j<p.length;j++) d += ' L '+p[j].x.toFixed(2)+' '+p[j].y.toFixed(2);
+        d += ' Z';
+        paths += '<path d="'+d+'" fill="none" stroke="#000" stroke-width="1.2"/>\n';
+      }
+      // Seed dots
+      for (var i=0;i<currentSeeds.length;i++) {
+        paths += '<circle cx="'+currentSeeds[i].x.toFixed(2)+'" cy="'+currentSeeds[i].y.toFixed(2)+'" r="1" fill="#000"/>\n';
+      }
+      var svg = '<?xml version="1.0" encoding="UTF-8"?><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 '+cfg.w+' '+cfg.h+'" width="'+cfg.w+'mm" height="'+cfg.h+'mm">\n'+paths+'</svg>';
+      var a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob([svg],{type:'image/svg+xml'}));
+      a.download = 'voronoi_pattern.svg'; a.click();
+      setStatus('SVG exported!', 'ok');
+    });
+
+    // ─── MOBILE DRAWER ───────────────────────────────────────
+    var sidebar = document.getElementById('sidebar');
+    var backdrop = document.getElementById('backdrop');
+    document.getElementById('btn-toggle-menu').addEventListener('click', function(){
+      sidebar.classList.add('open'); backdrop.classList.add('active');
+    });
+    document.getElementById('btn-close-sidebar').addEventListener('click', function(){
+      sidebar.classList.remove('open'); backdrop.classList.remove('active');
+    });
+    backdrop.addEventListener('click', function(){
+      sidebar.classList.remove('open'); backdrop.classList.remove('active');
+    });
+
+    // ─── SLIDER BINDINGS ─────────────────────────────────────
+    function bind(slId, valId, key, fmt, doFull) {
+      var sl = document.getElementById(slId), vl = document.getElementById(valId);
+      if (!sl) return;
+      sl.addEventListener('input', function() {
+        var v = parseFloat(sl.value); cfg[key] = v;
+        if (vl) vl.textContent = fmt(v);
+        if (doFull) rebuildAll(); else rebuildFromSeeds();
+      });
+    }
+    bind('s-seeds','v-seeds','seeds',function(v){return Math.round(v);},true);
+    bind('s-density','v-density','density',function(v){return Math.round(v*100)+'%';},true);
+    bind('s-spacing','v-spacing','spacing',function(v){return v.toFixed(1)+' mm';},false);
+    bind('s-depth','v-depth','depth',function(v){return Math.round(v)+' mm';},false);
+    bind('s-w','v-w','w',function(v){return Math.round(v)+' mm';},true);
+    bind('s-h','v-h','h',function(v){return Math.round(v)+' mm';},true);
+
+    function makeSeg(groupId, key, onChange) {
+      var btns = document.querySelectorAll('#'+groupId+' .seg-btn');
+      btns.forEach(function(btn) {
+        btn.addEventListener('click', function(){
+          btns.forEach(function(b){b.classList.remove('active')});
+          btn.classList.add('active');
+          cfg[key] = btn.getAttribute('data-v');
+          onChange && onChange(cfg[key]);
+        });
+      });
+    }
+
+    var modeLabels = {
+      'navigate':'📍 3D View',
+      'add':'➕ Add Seed',
+      'move':'✋ Drag Seed',
+      'delete':'❌ Remove Seed'
+    };
+    makeSeg('seg-mouse-mode','pointerMode',function(v){
+      document.getElementById('badge-pointer-mode').textContent = modeLabels[v] || '📍 3D View';
+      controls.enabled = (v === 'navigate');
+    });
+    makeSeg('seg-shape','shape',function(){ rebuildAll(); });
+    makeSeg('seg-mode','mode',function(){ rebuildFromSeeds(); });
+    makeSeg('seg-curve','curve',function(){ rebuildFromSeeds(); });
+
+    document.getElementById('chk-show-seeds').addEventListener('change', function(){
+      cfg.showSeeds = this.checked; updateSeedSpheres(); updateSVG2D();
+    });
+    document.getElementById('inp-color').addEventListener('input', function(){
+      cfg.color = this.value;
+      if (currentMesh && currentMesh.material) currentMesh.material.color.set(cfg.color);
+    });
+    document.getElementById('btn-rand').addEventListener('click', rebuildAll);
+    document.getElementById('btn-reset').addEventListener('click', resetCamera);
+
+    // ─── INIT ────────────────────────────────────────────────
     document.getElementById('loading').style.display = 'none';
-    generateAndBuildSeeds();
+    rebuildAll();
+
+    // Update SVG on panel resize
+    window.addEventListener('resize', function(){ setTimeout(updateSVG2D, 100); });
 
   })();
   </script>
