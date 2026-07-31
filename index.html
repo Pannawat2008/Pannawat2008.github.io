@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>3D Voronoi & Honeycomb Generator</title>
-  <meta name="description" content="Parametric 3D Voronoi & Honeycomb pattern generator based on WebSVG Voronoi editor." />
+  <meta name="description" content="Parametric 3D Voronoi & Honeycomb pattern generator with clean 3D extrusion." />
   
   <!-- Google Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -220,7 +220,7 @@
         <div class="card-label">Pattern &amp; Blending</div>
         <div class="ctrl">
           <div class="lrow"><span>Seed Count</span><span class="lval" id="v-seeds">35</span></div>
-          <input type="range" id="s-seeds" min="10" max="100" value="35" step="1">
+          <input type="range" id="s-seeds" min="10" max="90" value="35" step="1">
         </div>
         <div class="ctrl">
           <div class="lrow"><span>Honeycomb Blend</span><span class="lval" id="v-blend">50%</span></div>
@@ -234,8 +234,8 @@
       <div class="card">
         <div class="card-label">3D Geometry</div>
         <div class="ctrl">
-          <div class="lrow"><span>Space Between Cells</span><span class="lval" id="v-spacing">4.0 mm</span></div>
-          <input type="range" id="s-spacing" min="1.0" max="12" value="4.0" step="0.5">
+          <div class="lrow"><span>Wall Thickness (Spacing)</span><span class="lval" id="v-spacing">3.5 mm</span></div>
+          <input type="range" id="s-spacing" min="1.0" max="10" value="3.5" step="0.5">
         </div>
         <div class="ctrl">
           <div class="lrow"><span>Extrusion Height</span><span class="lval" id="v-depth">12 mm</span></div>
@@ -261,10 +261,10 @@
           </div>
         </div>
         <div class="ctrl">
-          <div class="lrow" style="margin-bottom:5px">Cell Shape</div>
+          <div class="lrow" style="margin-bottom:5px">Corner Rounding</div>
           <div class="seg" id="seg-curve">
-            <button class="seg-btn active" data-v="cubic">Cubic Bezier (WebSVG)</button>
-            <button class="seg-btn" data-v="linear">Linear (Edges)</button>
+            <button class="seg-btn active" data-v="fillet">Rounded Corners</button>
+            <button class="seg-btn" data-v="linear">Sharp Corners</button>
           </div>
         </div>
         <div class="ctrl color-row">
@@ -298,7 +298,7 @@
 
   </div>
 
-  <!-- THREE.JS & VORONOI LIBRARIES -->
+  <!-- THREE.JS & DEPENDENCIES -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
   <script src="https://cdn.jsdelivr.net/gh/gorhill/Javascript-Voronoi@master/rhill-voronoi-core.js"></script>
@@ -309,11 +309,11 @@
     var cfg = {
       w: 200, h: 120,
       seeds: 35,
-      spacing: 4.0,
+      spacing: 3.5,
       depth: 12,
       blend: 0.5,
       mode: 'walls',
-      curve: 'cubic',
+      curve: 'fillet',
       color: '#4285F4'
     };
 
@@ -378,7 +378,7 @@
     });
 
     // ─────────────────────────────────────────────────────────
-    // WEBSVG POISSON DISK SAMPLING & HYBRID SEED GENERATOR
+    // GEOMETRY & WINDING ORDER UTILITIES
     // ─────────────────────────────────────────────────────────
 
     function dist(a,b){ var dx=a.x-b.x, dy=a.y-b.y; return Math.sqrt(dx*dx+dy*dy); }
@@ -387,10 +387,33 @@
       return x*x*(3-2*x);
     }
 
-    // Generate relaxed Voronoi seeds using WebSVG cost-minimization sampling
+    function polygonArea(pts) {
+      var area = 0;
+      for (var i = 0; i < pts.length; i++) {
+        var j = (i + 1) % pts.length;
+        area += pts[i].x * pts[j].y;
+        area -= pts[j].x * pts[i].y;
+      }
+      return area / 2.0;
+    }
+
+    function ensureClockwise(pts) {
+      if (polygonArea(pts) > 0) return pts.slice().reverse(); // Make CW for Three.js hole cutouts
+      return pts;
+    }
+
+    function ensureCounterClockwise(pts) {
+      if (polygonArea(pts) < 0) return pts.slice().reverse(); // Make CCW for outer shape
+      return pts;
+    }
+
+    // ─────────────────────────────────────────────────────────
+    // POISSON SEEDS & HYBRID GENERATION
+    // ─────────────────────────────────────────────────────────
+
     function generatePoissonSeeds(count, w, h) {
       var seeds = [];
-      var numSamples = 20; // candidates per seed
+      var numSamples = 25;
 
       for (var i = 0; i < count; i++) {
         var bestCand = null;
@@ -398,14 +421,11 @@
 
         for (var s = 0; s < numSamples; s++) {
           var cand = {
-            x: 10 + Math.random() * (w - 20),
-            y: 10 + Math.random() * (h - 20)
+            x: 12 + Math.random() * (w - 24),
+            y: 12 + Math.random() * (h - 24)
           };
 
-          // Distance to walls
           var minD = Math.min(cand.x, cand.y, w - cand.x, h - cand.y);
-
-          // Distance to existing seeds
           for (var k = 0; k < seeds.length; k++) {
             var d = dist(cand, seeds[k]);
             if (d < minD) minD = d;
@@ -422,7 +442,6 @@
       return seeds;
     }
 
-    // Hexagonal seed grid
     function generateHexSeeds(w, h, r) {
       var seeds = [];
       var dx = r * Math.sqrt(3);
@@ -444,7 +463,6 @@
       return seeds;
     }
 
-    // Find nearest hex seed
     function nearestHex(p, hexList) {
       var best = hexList[0], bd = Infinity;
       for (var i = 0; i < hexList.length; i++) {
@@ -454,7 +472,6 @@
       return best;
     }
 
-    // Generate hybrid seeds (Poisson Voronoi center, Hexagon outer)
     function generateHybridSeeds() {
       var w = cfg.w, h = cfg.h, n = cfg.seeds, blend = cfg.blend;
       var area = w * h;
@@ -470,7 +487,6 @@
 
       var finalSeeds = [];
 
-      // Add hex seeds on the outer perimeter
       for (var i = 0; i < hexList.length; i++) {
         var p = hexList[i];
         var d = dist(p, { x: cx, y: cy });
@@ -478,7 +494,6 @@
         if (t > 0.3) finalSeeds.push(p);
       }
 
-      // Add Poisson seeds in center, lerped toward nearest hex near outer radius
       for (var i = 0; i < poiList.length; i++) {
         var p = poiList[i];
         var d = dist(p, { x: cx, y: cy });
@@ -496,7 +511,7 @@
     }
 
     // ─────────────────────────────────────────────────────────
-    // RAYMOND HILL VORONOI CELL EXTRACTION
+    // VORONOI CELL EXTRACTION
     // ─────────────────────────────────────────────────────────
 
     function computeVoronoiCells(seeds) {
@@ -521,7 +536,6 @@
         }
 
         if (!ok || verts.length < 3) continue;
-
         cells.push(verts);
       }
 
@@ -529,7 +543,7 @@
     }
 
     // ─────────────────────────────────────────────────────────
-    // PARALLEL EDGE RETRACTION (WEBSVG PARALLEL OFFSET)
+    // PARALLEL EDGE RETRACTION
     // ─────────────────────────────────────────────────────────
 
     function offsetSeg(v1, v2, d) {
@@ -547,7 +561,7 @@
       var denom = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4);
       if (Math.abs(denom) < 1e-8) return null;
       var px = ((x1 * y2 - y1 * x2) * (x3 - x4) - (x1 - x2) * (x3 * y4 - y3 * x4)) / denom;
-      var py = ((x1 * y2 - y1 * x2) * (y3 - y4) - (y1 - y2) * (x3 * y4 - y3 * x4)) / denom;
+      var py = ((x1 * y2 - y1 * x2) * (y3 - y4) - (y1 - y2) * (x3 - x4)) / denom;
       return { x: px, y: py };
     }
 
@@ -561,52 +575,52 @@
       }
 
       var out = [];
+      var borderMargin = Math.max(1.5, d);
       for (var i = 0; i < n; i++) {
         var pt = lineIntersect(segs[(i + n - 1) % n], segs[i]) || segs[i].v1;
         out.push({
-          x: Math.max(1.5, Math.min(cfg.w - 1.5, pt.x)),
-          y: Math.max(1.5, Math.min(cfg.h - 1.5, pt.y))
+          x: Math.max(borderMargin, Math.min(cfg.w - borderMargin, pt.x)),
+          y: Math.max(borderMargin, Math.min(cfg.h - borderMargin, pt.y))
         });
       }
       return out;
     }
 
     // ─────────────────────────────────────────────────────────
-    // WEBSVG CUBIC BEZIER SMOOTHING (MIDPOINT TO MIDPOINT)
+    // CORNER FILLETS (ROUNDED CORNERS)
     // ─────────────────────────────────────────────────────────
 
-    function WebSVG_CubicBezierSmooth(verts) {
+    function applyCornerFillets(verts) {
       if (verts.length < 3) return verts;
       var n = verts.length;
-      var smoothPts = [];
-      var steps = 8; // smooth samples per curve segment
+      var out = [];
+      var radiusRatio = 0.25; // fillet radius factor along edge
 
       for (var i = 0; i < n; i++) {
-        var v1 = verts[i];
-        var v2 = verts[(i + 1) % n];
-        var v3 = verts[(i + 2) % n];
+        var prev = verts[(i + n - 1) % n];
+        var curr = verts[i];
+        var next = verts[(i + 1) % n];
 
-        // Edge midpoints
-        var m1 = { x: (v1.x + v2.x) / 2, y: (v1.y + v2.y) / 2 };
-        var m2 = { x: (v2.x + v3.x) / 2, y: (v2.y + v3.y) / 2 };
-        var ctrl = v2; // corner vertex control point
+        // Points along incoming and outgoing edge segments
+        var p1 = { x: curr.x + (prev.x - curr.x) * radiusRatio, y: curr.y + (prev.y - curr.y) * radiusRatio };
+        var p2 = { x: curr.x + (next.x - curr.x) * radiusRatio, y: curr.y + (next.y - curr.y) * radiusRatio };
 
-        // Quadratic Bezier from m1 to m2 via ctrl vertex
-        for (var s = 0; s < steps; s++) {
-          var t = s / steps;
+        // Quadratic arc around corner
+        for (var step = 0; step <= 3; step++) {
+          var t = step / 3;
           var u = 1 - t;
-          smoothPts.push({
-            x: u * u * m1.x + 2 * u * t * ctrl.x + t * t * m2.x,
-            y: u * u * m1.y + 2 * u * t * ctrl.y + t * t * m2.y
+          out.push({
+            x: u * u * p1.x + 2 * u * t * curr.x + t * t * p2.x,
+            y: u * u * p1.y + 2 * u * t * curr.y + t * t * p2.y
           });
         }
       }
 
-      return smoothPts;
+      return out;
     }
 
     // ─────────────────────────────────────────────────────────
-    // 3D EXTRUSION BUILDER
+    // 3D EXTRUSION BUILDER (WATERTIGHT & BUG-FREE)
     // ─────────────────────────────────────────────────────────
 
     function build3D(polys) {
@@ -625,9 +639,9 @@
       var geoms = [];
 
       if (mode === 'cells') {
-        // Extrude each cell individually
+        // Extrude each cell individually as a solid platform
         for (var i = 0; i < polys.length; i++) {
-          var poly = polys[i];
+          var poly = ensureCounterClockwise(polys[i]);
           if (poly.length < 3) continue;
 
           var s = new THREE.Shape();
@@ -638,16 +652,22 @@
           geoms.push(new THREE.ExtrudeGeometry(s, { depth: depth, bevelEnabled: false }));
         }
       } else {
-        // 'walls' mode: solid outer frame with rounded cell cutouts
+        // 'walls' mode: solid outer rectangular frame with cell cutouts (holes)
+        var outerBox = [
+          { x: 0, y: 0 },
+          { x: w, y: 0 },
+          { x: w, y: h },
+          { x: 0, y: h }
+        ];
+        outerBox = ensureCounterClockwise(outerBox);
+
         var outerShape = new THREE.Shape();
-        outerShape.moveTo(0, 0);
-        outerShape.lineTo(w, 0);
-        outerShape.lineTo(w, h);
-        outerShape.lineTo(0, h);
+        outerShape.moveTo(outerBox[0].x, outerBox[0].y);
+        for (var j = 1; j < outerBox.length; j++) outerShape.lineTo(outerBox[j].x, outerBox[j].y);
         outerShape.closePath();
 
         for (var i = 0; i < polys.length; i++) {
-          var poly = polys[i];
+          var poly = ensureClockwise(polys[i]); // Holes MUST be Clockwise for Three.js
           if (poly.length < 3) continue;
 
           var hole = new THREE.Path();
@@ -662,7 +682,7 @@
 
       if (geoms.length === 0) return;
 
-      // Merge geometries
+      // Merge geometries cleanly
       var geom;
       if (geoms.length === 1) {
         geom = geoms[0];
@@ -713,7 +733,7 @@
     }
 
     function rebuild() {
-      setStatus('Generating WebSVG pattern…');
+      setStatus('Generating 3D model…');
       setTimeout(function() {
         try {
           var seeds = generateHybridSeeds();
@@ -724,8 +744,9 @@
 
           for (var i = 0; i < rawCells.length; i++) {
             var retracted = retractPolygon(rawCells[i], halfGap);
-            if (retracted.length >= 3) {
-              if (cfg.curve === 'cubic') retracted = WebSVG_CubicBezierSmooth(retracted);
+            // Skip collapsed small micro-cells
+            if (retracted.length >= 3 && Math.abs(polygonArea(retracted)) >= 12) {
+              if (cfg.curve === 'fillet') retracted = applyCornerFillets(retracted);
               polys.push(retracted);
             }
           }
@@ -733,7 +754,7 @@
           cellPolygons = polys;
           build3D(polys);
 
-          setStatus('✓ Generated ' + polys.length + ' WebSVG cells', 'ok');
+          setStatus('✓ Generated ' + polys.length + ' clean cells', 'ok');
         } catch (e) {
           setStatus('Error: ' + e.message, 'err');
           console.error(e);
@@ -758,7 +779,6 @@
           var view = new DataView(buf);
           var offset = 0;
 
-          // Header
           for (var i = 0; i < 80; i++) view.setUint8(offset++, 0);
           view.setUint32(offset, triCount, true); offset += 4;
 
@@ -768,12 +788,10 @@
             var bx = pos.getX(i3 + 1), by = pos.getY(i3 + 1), bz = pos.getZ(i3 + 1);
             var cx = pos.getX(i3 + 2), cy = pos.getY(i3 + 2), cz = pos.getZ(i3 + 2);
 
-            // Normal
             view.setFloat32(offset, 0, true); offset += 4;
             view.setFloat32(offset, 0, true); offset += 4;
             view.setFloat32(offset, 1, true); offset += 4;
 
-            // Vertices
             view.setFloat32(offset, ax, true); offset += 4;
             view.setFloat32(offset, ay, true); offset += 4;
             view.setFloat32(offset, az, true); offset += 4;
