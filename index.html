@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>3D Voronoi & Honeycomb Generator</title>
-  <meta name="description" content="Parametric 3D Voronoi & Honeycomb pattern generator. Export to STL for 3D printing or SVG for laser cutting." />
+  <meta name="description" content="Parametric 3D Voronoi & Honeycomb pattern generator based on WebSVG Voronoi editor." />
   
   <!-- Google Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -73,7 +73,7 @@
 
     /* SIDEBAR */
     .sidebar {
-      width: 320px;
+      width: 330px;
       background: var(--surface);
       border-right: 1px solid var(--border);
       overflow-y: auto;
@@ -179,21 +179,16 @@
     }
     .v-btn:hover { color: var(--blue); box-shadow: var(--shadow2); }
 
-    /* Loading overlay */
     #loading {
       position: absolute; inset: 0;
       display: flex; flex-direction: column;
       align-items: center; justify-content: center;
-      background: var(--bg);
-      font-size: 14px; color: var(--text2);
-      gap: 12px;
+      background: var(--bg); font-size: 14px; color: var(--text2); gap: 12px;
     }
     .spinner {
       width: 36px; height: 36px;
-      border: 3px solid var(--border);
-      border-top-color: var(--blue);
-      border-radius: 50%;
-      animation: spin .8s linear infinite;
+      border: 3px solid var(--border); border-top-color: var(--blue);
+      border-radius: 50%; animation: spin .8s linear infinite;
     }
     @keyframes spin { to { transform: rotate(360deg); } }
   </style>
@@ -224,23 +219,23 @@
       <div class="card">
         <div class="card-label">Pattern &amp; Blending</div>
         <div class="ctrl">
-          <div class="lrow"><span>Grid Density / Hex Size</span><span class="lval" id="v-seeds">Hex ~20mm</span></div>
-          <input type="range" id="s-seeds" min="10" max="40" value="20" step="1">
+          <div class="lrow"><span>Seed Count</span><span class="lval" id="v-seeds">35</span></div>
+          <input type="range" id="s-seeds" min="10" max="100" value="35" step="1">
         </div>
         <div class="ctrl">
-          <div class="lrow"><span>Center Voronoi Radius</span><span class="lval" id="v-blend">50%</span></div>
+          <div class="lrow"><span>Honeycomb Blend</span><span class="lval" id="v-blend">50%</span></div>
           <input type="range" id="s-blend" min="0" max="1" value="0.5" step="0.05">
         </div>
         <div class="ctrl">
-          <button class="btn btn-outline" id="btn-rand">🎲 Randomize Center Voronoi</button>
+          <button class="btn btn-outline" id="btn-rand">🎲 Resample Poisson Seeds</button>
         </div>
       </div>
 
       <div class="card">
         <div class="card-label">3D Geometry</div>
         <div class="ctrl">
-          <div class="lrow"><span>Wall Thickness (Spacing)</span><span class="lval" id="v-spacing">2.5 mm</span></div>
-          <input type="range" id="s-spacing" min="0.5" max="8" value="2.5" step="0.5">
+          <div class="lrow"><span>Space Between Cells</span><span class="lval" id="v-spacing">4.0 mm</span></div>
+          <input type="range" id="s-spacing" min="1.0" max="12" value="4.0" step="0.5">
         </div>
         <div class="ctrl">
           <div class="lrow"><span>Extrusion Height</span><span class="lval" id="v-depth">12 mm</span></div>
@@ -261,20 +256,19 @@
         <div class="ctrl">
           <div class="lrow" style="margin-bottom:5px">Extrusion Mode</div>
           <div class="seg" id="seg-mode">
-            <button class="seg-btn active" data-v="walls">Walls</button>
-            <button class="seg-btn" data-v="cells">Cells</button>
-            <button class="seg-btn" data-v="through">Through</button>
+            <button class="seg-btn active" data-v="walls">Solid Frame (Grille)</button>
+            <button class="seg-btn" data-v="cells">Solid Cells</button>
           </div>
         </div>
         <div class="ctrl">
-          <div class="lrow" style="margin-bottom:5px">Edge Style</div>
+          <div class="lrow" style="margin-bottom:5px">Cell Shape</div>
           <div class="seg" id="seg-curve">
-            <button class="seg-btn active" data-v="straight">Linear (Hex)</button>
-            <button class="seg-btn" data-v="bezier">Smooth (Curved)</button>
+            <button class="seg-btn active" data-v="cubic">Cubic Bezier (WebSVG)</button>
+            <button class="seg-btn" data-v="linear">Linear (Edges)</button>
           </div>
         </div>
         <div class="ctrl color-row">
-          <span style="font-size:12px;font-weight:500;color:var(--text2)">Preview Color</span>
+          <span style="font-size:12px;font-weight:500;color:var(--text2)">Model Color</span>
           <input type="color" id="inp-color" value="#4285F4">
         </div>
       </div>
@@ -298,13 +292,13 @@
         <span>Loading 3D engine…</span>
       </div>
       <div class="v-overlay">
-        <button class="v-btn" id="btn-reset">🎯 Reset View</button>
+        <button class="v-btn" id="btn-reset">🎯 Reset Camera</button>
       </div>
     </div>
 
   </div>
 
-  <!-- THREE.JS & DEPENDENCIES FROM CDN -->
+  <!-- THREE.JS & VORONOI LIBRARIES -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
   <script src="https://cdn.jsdelivr.net/gh/gorhill/Javascript-Voronoi@master/rhill-voronoi-core.js"></script>
@@ -314,12 +308,12 @@
     // CONFIG
     var cfg = {
       w: 200, h: 120,
-      hexSize: 20, // distance between hex centers
-      spacing: 2.5,
+      seeds: 35,
+      spacing: 4.0,
       depth: 12,
       blend: 0.5,
       mode: 'walls',
-      curve: 'straight',
+      curve: 'cubic',
       color: '#4285F4'
     };
 
@@ -345,7 +339,7 @@
     controls.enableDamping = true;
     controls.dampingFactor = 0.05;
 
-    // Lights
+    // Lighting
     scene.add(new THREE.AmbientLight(0xffffff, 0.7));
     var sun = new THREE.DirectionalLight(0xffffff, 0.85);
     sun.position.set(150, 300, 200);
@@ -384,7 +378,7 @@
     });
 
     // ─────────────────────────────────────────────────────────
-    // PERFECT HEXAGONAL SEEDS & CENTER VORONOI PERTURBATION
+    // WEBSVG POISSON DISK SAMPLING & HYBRID SEED GENERATOR
     // ─────────────────────────────────────────────────────────
 
     function dist(a,b){ var dx=a.x-b.x, dy=a.y-b.y; return Math.sqrt(dx*dx+dy*dy); }
@@ -393,181 +387,230 @@
       return x*x*(3-2*x);
     }
 
-    // Seed generation: Exact hexagonal grid, perturbed in the center
-    function generateSeeds(){
-      var w = cfg.w, h = cfg.h;
-      var r = cfg.hexSize;
+    // Generate relaxed Voronoi seeds using WebSVG cost-minimization sampling
+    function generatePoissonSeeds(count, w, h) {
+      var seeds = [];
+      var numSamples = 20; // candidates per seed
+
+      for (var i = 0; i < count; i++) {
+        var bestCand = null;
+        var maxMinDist = -1;
+
+        for (var s = 0; s < numSamples; s++) {
+          var cand = {
+            x: 10 + Math.random() * (w - 20),
+            y: 10 + Math.random() * (h - 20)
+          };
+
+          // Distance to walls
+          var minD = Math.min(cand.x, cand.y, w - cand.x, h - cand.y);
+
+          // Distance to existing seeds
+          for (var k = 0; k < seeds.length; k++) {
+            var d = dist(cand, seeds[k]);
+            if (d < minD) minD = d;
+          }
+
+          if (minD > maxMinDist) {
+            maxMinDist = minD;
+            bestCand = cand;
+          }
+        }
+
+        if (bestCand) seeds.push(bestCand);
+      }
+      return seeds;
+    }
+
+    // Hexagonal seed grid
+    function generateHexSeeds(w, h, r) {
+      var seeds = [];
       var dx = r * Math.sqrt(3);
       var dy = r * 1.5;
-
       var cols = Math.ceil(w / dx) + 4;
       var rows = Math.ceil(h / dy) + 4;
 
-      var cx = w / 2, cy = h / 2;
-      var maxRadius = Math.min(w, h) * 0.5 * cfg.blend; // radius of Voronoi zone
-
-      var seeds = [];
-      var seedId = 0;
-
       for (var row = -2; row < rows; row++) {
-        var xOffset = (row % 2 !== 0) ? dx / 2 : 0;
+        var xOff = (row % 2 !== 0) ? dx / 2 : 0;
         var y = row * dy - dy;
 
         for (var col = -2; col < cols; col++) {
-          var x = col * dx + xOffset - dx;
+          var x = col * dx + xOff - dx;
+          seeds.push({ x: x, y: y });
+        }
+      }
+      return seeds;
+    }
 
-          var d = dist({ x: x, y: y }, { x: cx, y: cy });
+    // Find nearest hex seed
+    function nearestHex(p, hexList) {
+      var best = hexList[0], bd = Infinity;
+      for (var i = 0; i < hexList.length; i++) {
+        var d = dist(p, hexList[i]);
+        if (d < bd) { bd = d; best = hexList[i]; }
+      }
+      return best;
+    }
 
-          // Perturbation strength: 1.0 at center, 0.0 outside maxRadius
-          var pertFactor = 1.0 - smoothstep(0, maxRadius, d);
+    // Generate hybrid seeds (Poisson Voronoi center, Hexagon outer)
+    function generateHybridSeeds() {
+      var w = cfg.w, h = cfg.h, n = cfg.seeds, blend = cfg.blend;
+      var area = w * h;
+      var hexR = Math.sqrt((2 * area) / (3 * Math.sqrt(3) * n));
 
-          // Displace center seeds randomly
-          var jitterX = (Math.random() - 0.5) * r * 1.2 * pertFactor;
-          var jitterY = (Math.random() - 0.5) * r * 1.2 * pertFactor;
+      var hexList = generateHexSeeds(w, h, hexR);
+      var poiList = generatePoissonSeeds(n, w, h);
 
-          seeds.push({
-            id: seedId++,
-            x: x + jitterX,
-            y: y + jitterY
+      var cx = w / 2, cy = h / 2;
+      var maxRadius = Math.min(w, h) * 0.5;
+      var innerRadius = maxRadius * (1.0 - blend) * 0.3;
+      var outerRadius = maxRadius * (1.0 - blend * 0.5);
+
+      var finalSeeds = [];
+
+      // Add hex seeds on the outer perimeter
+      for (var i = 0; i < hexList.length; i++) {
+        var p = hexList[i];
+        var d = dist(p, { x: cx, y: cy });
+        var t = smoothstep(innerRadius, outerRadius, d);
+        if (t > 0.3) finalSeeds.push(p);
+      }
+
+      // Add Poisson seeds in center, lerped toward nearest hex near outer radius
+      for (var i = 0; i < poiList.length; i++) {
+        var p = poiList[i];
+        var d = dist(p, { x: cx, y: cy });
+        var t = smoothstep(innerRadius, outerRadius, d);
+        if (t < 0.8) {
+          var nh = nearestHex(p, hexList);
+          finalSeeds.push({
+            x: p.x + (nh.x - p.x) * t,
+            y: p.y + (nh.y - p.y) * t
           });
         }
       }
 
-      return seeds;
+      return finalSeeds;
     }
 
     // ─────────────────────────────────────────────────────────
-    // EXACT VORONOI COMPUTATION USING FORTUNE'S ALGORITHM
+    // RAYMOND HILL VORONOI CELL EXTRACTION
     // ─────────────────────────────────────────────────────────
 
-    function computeVoronoiCells(seeds){
-      var bbox = { xl: -cfg.hexSize, xr: cfg.w + cfg.hexSize, yt: -cfg.hexSize, yb: cfg.h + cfg.hexSize };
+    function computeVoronoiCells(seeds) {
+      var margin = 40;
+      var bbox = { xl: -margin, xr: cfg.w + margin, yt: -margin, yb: cfg.h + margin };
       var voronoi = new Voronoi();
       var diagram = voronoi.compute(seeds, bbox);
 
-      var polygons = [];
+      var cells = [];
 
       for (var i = 0; i < diagram.cells.length; i++) {
-        var cell = diagram.cells[i];
-        if (!cell || !cell.halfedges || cell.halfedges.length < 3) continue;
+        var c = diagram.cells[i];
+        if (!c || !c.halfedges || c.halfedges.length < 3) continue;
 
-        // Extract counter-clockwise vertices
-        var vertices = [];
-        var valid = true;
+        var verts = [];
+        var ok = true;
 
-        for (var j = 0; j < cell.halfedges.length; j++) {
-          var he = cell.halfedges[j];
-          var pt = he.getStartpoint();
-          if (!pt || isNaN(pt.x) || isNaN(pt.y)) { valid = false; break; }
-          vertices.push({ x: pt.x, y: pt.y });
+        for (var j = 0; j < c.halfedges.length; j++) {
+          var he = c.halfedges[j];
+          var p = he.getStartpoint();
+          if (!p || isNaN(p.x) || isNaN(p.y)) { ok = false; break; }
+          verts.push({ x: p.x, y: p.y });
         }
 
-        if (!valid || vertices.length < 3) continue;
+        if (!ok || verts.length < 3) continue;
 
-        // Keep only cells whose site is within or near panel bounding box [0, w] x [0, h]
-        var site = cell.site;
-        if (site.x >= -cfg.hexSize*0.5 && site.x <= cfg.w + cfg.hexSize*0.5 &&
-            site.y >= -cfg.hexSize*0.5 && site.y <= cfg.h + cfg.hexSize*0.5) {
-          polygons.push(vertices);
+        // Keep cells inside/near view bounding box
+        var s = c.site;
+        if (s.x >= -margin * 0.5 && s.x <= cfg.w + margin * 0.5 &&
+            s.y >= -margin * 0.5 && s.y <= cfg.h + margin * 0.5) {
+          cells.push(verts);
         }
       }
 
-      return polygons;
+      return cells;
     }
 
     // ─────────────────────────────────────────────────────────
-    // PARALLEL EDGE RETRACTION (EVEN WALL SPACING)
+    // PARALLEL EDGE RETRACTION (WEBSVG PARALLEL OFFSET)
     // ─────────────────────────────────────────────────────────
 
-    function offsetSegment(v1, v2, dist) {
+    function offsetSeg(v1, v2, d) {
       var dx = v2.x - v1.x, dy = v2.y - v1.y;
       var len = Math.sqrt(dx * dx + dy * dy);
       if (len < 1e-7) return { v1: { x: v1.x, y: v1.y }, v2: { x: v2.x, y: v2.y } };
-
-      // Inward normal (left perpendicular in CCW order)
-      var nx = -dy / len;
-      var ny = dx / len;
-
-      return {
-        v1: { x: v1.x + nx * dist, y: v1.y + ny * dist },
-        v2: { x: v2.x + nx * dist, y: v2.y + ny * dist }
-      };
+      var nx = -dy / len * d;
+      var ny = dx / len * d;
+      return { v1: { x: v1.x + nx, y: v1.y + ny }, v2: { x: v2.x + nx, y: v2.y + ny } };
     }
 
     function lineIntersect(s1, s2) {
       var x1 = s1.v1.x, y1 = s1.v1.y, x2 = s1.v2.x, y2 = s1.v2.y;
       var x3 = s2.v1.x, y3 = s2.v1.y, x4 = s2.v2.x, y4 = s2.v2.y;
-
       var denom = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4);
       if (Math.abs(denom) < 1e-8) return null;
-
       var px = ((x1 * y2 - y1 * x2) * (x3 - x4) - (x1 - x2) * (x3 * y4 - y3 * x4)) / denom;
       var py = ((x1 * y2 - y1 * x2) * (y3 - y4) - (y1 - y2) * (x3 * y4 - y3 * x4)) / denom;
-
       return { x: px, y: py };
     }
 
-    function retractPolygon(vertices, wallOffset) {
-      if (vertices.length < 3 || wallOffset <= 0) return vertices;
-
-      var n = vertices.length;
-      var offsetSegs = [];
+    function retractPolygon(verts, d) {
+      if (verts.length < 3 || d <= 0) return verts;
+      var n = verts.length;
+      var segs = [];
 
       for (var i = 0; i < n; i++) {
-        var v1 = vertices[i];
-        var v2 = vertices[(i + 1) % n];
-        offsetSegs.push(offsetSegment(v1, v2, wallOffset));
+        segs.push(offsetSeg(verts[i], verts[(i + 1) % n], d));
       }
 
-      var retracted = [];
+      var out = [];
       for (var i = 0; i < n; i++) {
-        var seg1 = offsetSegs[(i + n - 1) % n];
-        var seg2 = offsetSegs[i];
-        var pt = lineIntersect(seg1, seg2);
-        if (pt && !isNaN(pt.x) && !isNaN(pt.y)) {
-          retracted.push(pt);
-        } else {
-          retracted.push(seg2.v1);
-        }
+        var pt = lineIntersect(segs[(i + n - 1) % n], segs[i]);
+        out.push(pt || segs[i].v1);
       }
-
-      return retracted;
+      return out;
     }
 
     // ─────────────────────────────────────────────────────────
-    // BEZIER SMOOTHING
+    // WEBSVG CUBIC BEZIER SMOOTHING (MIDPOINT TO MIDPOINT)
     // ─────────────────────────────────────────────────────────
 
-    function smoothPolygon(vertices) {
-      if (vertices.length < 3) return vertices;
-      var smoothed = [];
-      var n = vertices.length;
+    function WebSVG_CubicBezierSmooth(verts) {
+      if (verts.length < 3) return verts;
+      var n = verts.length;
+      var smoothPts = [];
+      var steps = 8; // smooth samples per curve segment
 
       for (var i = 0; i < n; i++) {
-        var curr = vertices[i];
-        var next = vertices[(i + 1) % n];
-        var mid = { x: (curr.x + next.x) / 2, y: (curr.y + next.y) / 2 };
-        var prev = vertices[(i + n - 1) % n];
-        var prevMid = { x: (prev.x + curr.x) / 2, y: (prev.y + curr.y) / 2 };
+        var v1 = verts[i];
+        var v2 = verts[(i + 1) % n];
+        var v3 = verts[(i + 2) % n];
 
-        for (var step = 0; step < 5; step++) {
-          var t = step / 5;
+        // Edge midpoints
+        var m1 = { x: (v1.x + v2.x) / 2, y: (v1.y + v2.y) / 2 };
+        var m2 = { x: (v2.x + v3.x) / 2, y: (v2.y + v3.y) / 2 };
+        var ctrl = v2; // corner vertex control point
+
+        // Quadratic Bezier from m1 to m2 via ctrl vertex
+        for (var s = 0; s < steps; s++) {
+          var t = s / steps;
           var u = 1 - t;
-          smoothed.push({
-            x: u * u * prevMid.x + 2 * u * t * curr.x + t * t * mid.x,
-            y: u * u * prevMid.y + 2 * u * t * curr.y + t * t * mid.y
+          smoothPts.push({
+            x: u * u * m1.x + 2 * u * t * ctrl.x + t * t * m2.x,
+            y: u * u * m1.y + 2 * u * t * ctrl.y + t * t * m2.y
           });
         }
       }
 
-      return smoothed;
+      return smoothPts;
     }
 
     // ─────────────────────────────────────────────────────────
-    // 3D EXTRUSION GEOMETRY BUILDER
+    // 3D EXTRUSION BUILDER
     // ─────────────────────────────────────────────────────────
 
-    function build3DGeometry(polygons) {
+    function build3D(polys) {
       if (currentMesh) {
         scene.remove(currentMesh);
         if (currentMesh.geometry) currentMesh.geometry.dispose();
@@ -575,17 +618,17 @@
         currentMesh = null;
       }
 
-      if (!polygons || polygons.length === 0) return;
+      if (!polys || polys.length === 0) return;
 
       var w = cfg.w, h = cfg.h, depth = cfg.depth, mode = cfg.mode;
       var color = new THREE.Color(cfg.color);
 
-      var shapes = [];
+      var geoms = [];
 
       if (mode === 'cells') {
-        // Extrude each individual polygon as a solid cell
-        for (var i = 0; i < polygons.length; i++) {
-          var poly = polygons[i];
+        // Extrude each cell individually
+        for (var i = 0; i < polys.length; i++) {
+          var poly = polys[i];
           if (poly.length < 3) continue;
 
           var s = new THREE.Shape();
@@ -593,10 +636,10 @@
           for (var j = 1; j < poly.length; j++) s.lineTo(poly[j].x, poly[j].y);
           s.closePath();
 
-          shapes.push(new THREE.ExtrudeGeometry(s, { depth: depth, bevelEnabled: false }));
+          geoms.push(new THREE.ExtrudeGeometry(s, { depth: depth, bevelEnabled: false }));
         }
       } else {
-        // 'walls' or 'through' mode: solid outer frame with cell cutouts
+        // 'walls' mode: solid outer frame with rounded cell cutouts
         var outerShape = new THREE.Shape();
         outerShape.moveTo(0, 0);
         outerShape.lineTo(w, 0);
@@ -604,8 +647,8 @@
         outerShape.lineTo(0, h);
         outerShape.closePath();
 
-        for (var i = 0; i < polygons.length; i++) {
-          var poly = polygons[i];
+        for (var i = 0; i < polys.length; i++) {
+          var poly = polys[i];
           if (poly.length < 3) continue;
 
           var hole = new THREE.Path();
@@ -615,34 +658,30 @@
           outerShape.holes.push(hole);
         }
 
-        shapes.push(new THREE.ExtrudeGeometry(outerShape, { depth: depth, bevelEnabled: false }));
+        geoms.push(new THREE.ExtrudeGeometry(outerShape, { depth: depth, bevelEnabled: false }));
       }
 
-      if (shapes.length === 0) return;
+      if (geoms.length === 0) return;
 
-      // Merge all extruded geometries
+      // Merge geometries
       var geom;
-      if (shapes.length === 1) {
-        geom = shapes[0];
+      if (geoms.length === 1) {
+        geom = geoms[0];
       } else {
-        // Simple manual merge for multiple cell extrusions
-        var merged = new THREE.BufferGeometry();
         var pos = [], norm = [];
-
-        for (var i = 0; i < shapes.length; i++) {
-          var p = shapes[i].attributes.position.array;
-          var n = shapes[i].attributes.normal ? shapes[i].attributes.normal.array : null;
-
+        for (var i = 0; i < geoms.length; i++) {
+          var p = geoms[i].attributes.position.array;
+          var n = geoms[i].attributes.normal ? geoms[i].attributes.normal.array : null;
           for (var k = 0; k < p.length; k++) pos.push(p[k]);
           if (n) { for (var k = 0; k < n.length; k++) norm.push(n[k]); }
         }
-
+        var merged = new THREE.BufferGeometry();
         merged.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
         if (norm.length > 0) merged.setAttribute('normal', new THREE.Float32BufferAttribute(norm, 3));
         geom = merged;
       }
 
-      // Center geometry origin to center of viewport
+      // Center geometry origin
       geom.computeBoundingBox();
       var box = geom.boundingBox;
       var cx = (box.max.x + box.min.x) / 2;
@@ -652,8 +691,8 @@
 
       var mat = new THREE.MeshStandardMaterial({
         color: color,
-        roughness: 0.3,
-        metalness: 0.1,
+        roughness: 0.35,
+        metalness: 0.05,
         side: THREE.DoubleSide
       });
 
@@ -664,7 +703,7 @@
     }
 
     // ─────────────────────────────────────────────────────────
-    // APP REBUILD CONTROLLER
+    // REBUILD CONTROLLER
     // ─────────────────────────────────────────────────────────
 
     function setStatus(msg, cls) {
@@ -674,27 +713,27 @@
     }
 
     function rebuild() {
-      setStatus('Generating pattern…');
+      setStatus('Generating WebSVG pattern…');
       setTimeout(function() {
         try {
-          var seeds = generateSeeds();
-          var rawPolys = computeVoronoiCells(seeds);
+          var seeds = generateHybridSeeds();
+          var rawCells = computeVoronoiCells(seeds);
 
-          var wallOffset = cfg.spacing / 2.0; // Half thickness on each cell edge
+          var halfGap = cfg.spacing / 2.0; // Inward offset per cell edge
           var polys = [];
 
-          for (var i = 0; i < rawPolys.length; i++) {
-            var retracted = retractPolygon(rawPolys[i], wallOffset);
+          for (var i = 0; i < rawCells.length; i++) {
+            var retracted = retractPolygon(rawCells[i], halfGap);
             if (retracted.length >= 3) {
-              if (cfg.curve === 'bezier') retracted = smoothPolygon(retracted);
+              if (cfg.curve === 'cubic') retracted = WebSVG_CubicBezierSmooth(retracted);
               polys.push(retracted);
             }
           }
 
           cellPolygons = polys;
-          build3DGeometry(polys);
+          build3D(polys);
 
-          setStatus('✓ Generated ' + polys.length + ' cells', 'ok');
+          setStatus('✓ Generated ' + polys.length + ' WebSVG cells', 'ok');
         } catch (e) {
           setStatus('Error: ' + e.message, 'err');
           console.error(e);
@@ -772,7 +811,7 @@
         var d = 'M ' + p[0].x.toFixed(2) + ' ' + p[0].y.toFixed(2);
         for (var j = 1; j < p.length; j++) d += ' L ' + p[j].x.toFixed(2) + ' ' + p[j].y.toFixed(2);
         d += ' Z';
-        paths += '  <path d="' + d + '" fill="#4285F4" fill-opacity="0.2" stroke="#1A73E8" stroke-width="1.5"/>\n';
+        paths += '  <path d="' + d + '" fill="#4285F4" fill-opacity="0.18" stroke="#1A73E8" stroke-width="1.5"/>\n';
       }
 
       var svg = '<?xml version="1.0" encoding="UTF-8"?>\n<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' + cfg.w + ' ' + cfg.h + '" width="' + cfg.w + 'mm" height="' + cfg.h + 'mm">\n  <rect width="' + cfg.w + '" height="' + cfg.h + '" fill="none" stroke="#333" stroke-width="2"/>\n' + paths + '</svg>';
@@ -786,7 +825,7 @@
     }
 
     // ─────────────────────────────────────────────────────────
-    // UI EVENT BINDINGS
+    // UI BINDINGS
     // ─────────────────────────────────────────────────────────
 
     function bind(sliderId, valId, cfgKey, fmt) {
@@ -800,7 +839,7 @@
       });
     }
 
-    bind('s-seeds', 'v-seeds', 'hexSize', function(v) { return 'Hex ~' + Math.round(v) + 'mm'; });
+    bind('s-seeds', 'v-seeds', 'seeds', function(v) { return Math.round(v); });
     bind('s-blend', 'v-blend', 'blend', function(v) { return Math.round(v * 100) + '%'; });
     bind('s-spacing', 'v-spacing', 'spacing', function(v) { return v.toFixed(1) + ' mm'; });
     bind('s-depth', 'v-depth', 'depth', function(v) { return Math.round(v) + ' mm'; });
@@ -831,7 +870,7 @@
     document.getElementById('btn-stl').addEventListener('click', exportSTL);
     document.getElementById('btn-svg').addEventListener('click', exportSVG);
 
-    // INITIAL BUILD
+    // INITIALIZATION
     document.getElementById('loading').style.display = 'none';
     rebuild();
 
