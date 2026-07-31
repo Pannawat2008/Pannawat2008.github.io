@@ -511,46 +511,30 @@
       return pts;
     }
 
-    function pointInBlob(p) {
+    function getBlobRadiusAtAngle(angle) {
+      var b = getBlobBounds();
+      var bump = 1 + b.bumpAmp * Math.sin(b.bumpFreq * angle + 0.5);
+      return Math.sqrt(Math.pow(b.rx * bump * Math.cos(angle), 2) + Math.pow(b.ry * bump * Math.sin(angle), 2));
+    }
+
+    function pointInBlobMargin(p, margin) {
       var b = getBlobBounds();
       var dx = p.x - b.cx, dy = p.y - b.cy;
       var angle = Math.atan2(dy, dx);
-      var bump = 1 + b.bumpAmp * Math.sin(b.bumpFreq * angle + 0.5);
-      var maxDist = Math.sqrt(Math.pow(b.rx * bump * Math.cos(angle), 2) + Math.pow(b.ry * bump * Math.sin(angle), 2));
+      var maxDist = getBlobRadiusAtAngle(angle) - (margin || 0);
       return Math.sqrt(dx * dx + dy * dy) <= maxDist;
-    }
-
-    function clampPointToShape(p) {
-      if (cfg.shape === 'blob') {
-        var b = getBlobBounds();
-        var dx = p.x - b.cx, dy = p.y - b.cy;
-        var d = Math.sqrt(dx * dx + dy * dy);
-        if (d < 1e-5) return { x: p.x, y: p.y };
-        var angle = Math.atan2(dy, dx);
-        var bump = 1 + b.bumpAmp * Math.sin(b.bumpFreq * angle + 0.5);
-        var maxDist = Math.sqrt(Math.pow(b.rx * bump * Math.cos(angle), 2) + Math.pow(b.ry * bump * Math.sin(angle), 2)) - 2;
-        if (d > maxDist) {
-          return { x: b.cx + maxDist * Math.cos(angle), y: b.cy + maxDist * Math.sin(angle) };
-        }
-        return { x: p.x, y: p.y };
-      } else {
-        return {
-          x: Math.max(2, Math.min(cfg.w - 2, p.x)),
-          y: Math.max(2, Math.min(cfg.h - 2, p.y))
-        };
-      }
     }
 
     // ─── SEED GENERATION ─────────────────────────────────────
     function hexSeeds(w, h, r) {
       var seeds = [];
       var dx = r * Math.sqrt(3), dy = r * 1.5;
-      var cols = Math.ceil(w/dx)+2, rows = Math.ceil(h/dy)+2;
-      for (var row = -1; row < rows; row++) {
+      var cols = Math.ceil(w/dx)+4, rows = Math.ceil(h/dy)+4;
+      for (var row = -2; row < rows; row++) {
         var xOff = (row % 2 !== 0) ? dx/2 : 0;
-        for (var col = -1; col < cols; col++) {
+        for (var col = -2; col < cols; col++) {
           var x = col*dx + xOff, y = row*dy;
-          if (x >= -5 && x <= w+5 && y >= -5 && y <= h+5) seeds.push({x:x, y:y});
+          seeds.push({x:x, y:y});
         }
       }
       return seeds;
@@ -567,8 +551,8 @@
 
       var finalSeeds = [];
       var inShape = function(p) {
-        if (cfg.shape === 'blob') return pointInBlob(p);
-        return p.x >= 2 && p.x <= w-2 && p.y >= 2 && p.y <= h-2;
+        if (cfg.shape === 'blob') return pointInBlobMargin(p, cfg.spacing * 0.5);
+        return p.x >= cfg.spacing && p.x <= w - cfg.spacing && p.y >= cfg.spacing && p.y <= h - cfg.spacing;
       };
 
       // Outer ring: regular hex grid
@@ -605,9 +589,11 @@
       return finalSeeds;
     }
 
-    // ─── VORONOI CELLS WITH POLAR VERTEX SORTING ─────────────
+    // ─── VORONOI CELLS ───────────────────────────────────────
     function computeVoronoiCells(seeds) {
-      var bbox = { xl: 0, xr: cfg.w, yt: 0, yb: cfg.h };
+      // Large bounding box so outer cells are not prematurely cropped by artificial rectangle
+      var margin = 40;
+      var bbox = { xl: -margin, xr: cfg.w + margin, yt: -margin, yb: cfg.h + margin };
       var voronoi = new Voronoi();
       var diagram = voronoi.compute(seeds, bbox);
       var cells = [];
@@ -622,7 +608,7 @@
         }
         if (!ok || verts.length < 3) continue;
 
-        // CRITICAL FIX: Sort vertices by polar angle around cell centroid!
+        // Sort vertices by polar angle around cell centroid
         var cx = 0, cy = 0;
         for (var k = 0; k < verts.length; k++) { cx += verts[k].x; cy += verts[k].y; }
         cx /= verts.length; cy /= verts.length;
@@ -636,12 +622,13 @@
       return cells;
     }
 
-    // ─── BULLETPROOF CENTROID RETRACTION (NO SPIKES) ─────────
+    // ─── PROPORTIONAL CELL RETRACTION (EVEN WALLS, UNWARPED HEXES) ─
     function retractPolygon(verts, d) {
       if (verts.length < 3 || d <= 0) return verts;
       var c = getCentroid(verts);
       var n = verts.length;
 
+      // Calculate inradius (distance to closest edge)
       var minInradius = Infinity;
       for (var i = 0; i < n; i++) {
         var v1 = verts[i], v2 = verts[(i + 1) % n];
@@ -657,11 +644,10 @@
       var scale = Math.max(0.08, 1.0 - d / minInradius);
       var out = [];
       for (var i = 0; i < n; i++) {
-        var pt = {
+        out.push({
           x: c.x + (verts[i].x - c.x) * scale,
           y: c.y + (verts[i].y - c.y) * scale
-        };
-        out.push(clampPointToShape(pt));
+        });
       }
 
       return cleanPoly(out);
@@ -858,12 +844,17 @@
 
           for (var i = 0; i < rawCells.length; i++) {
             var cell = ensureCCW(rawCells[i]);
-
-            // Filter cells by shape boundary
             var cCenter = getCentroid(cell);
-            if (cfg.shape === 'blob' && !pointInBlob(cCenter)) continue;
 
-            // Retract for wall thickness
+            // Filter out cells that fall outside the margin boundary
+            if (cfg.shape === 'blob') {
+              if (!pointInBlobMargin(cCenter, cfg.spacing * 1.2)) continue;
+            } else {
+              if (cCenter.x < cfg.spacing || cCenter.x > cfg.w - cfg.spacing ||
+                  cCenter.y < cfg.spacing || cCenter.y > cfg.h - cfg.spacing) continue;
+            }
+
+            // Retract for wall thickness preserving natural hexagon scaling
             var ret = retractPolygon(cell, half);
             if (!ret || ret.length < 3 || Math.abs(polygonArea(ret)) < 10) continue;
             if (cfg.curve === 'fillet') ret = applyFillets(ret);
