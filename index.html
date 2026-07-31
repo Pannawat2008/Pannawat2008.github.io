@@ -562,8 +562,11 @@
 
       var out = [];
       for (var i = 0; i < n; i++) {
-        var pt = lineIntersect(segs[(i + n - 1) % n], segs[i]);
-        out.push(pt || segs[i].v1);
+        var pt = lineIntersect(segs[(i + n - 1) % n], segs[i]) || segs[i].v1;
+        out.push({
+          x: Math.max(1.5, Math.min(cfg.w - 1.5, pt.x)),
+          y: Math.max(1.5, Math.min(cfg.h - 1.5, pt.y))
+        });
       }
       return out;
     }
