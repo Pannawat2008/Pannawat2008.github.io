@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
   <title>3D Voronoi & Honeycomb Generator</title>
-  <meta name="description" content="Parametric 3D Voronoi & Honeycomb pattern generator with mobile touch controls." />
+  <meta name="description" content="Parametric 3D Voronoi & Honeycomb pattern generator with interactive seed editing." />
   
   <!-- Google Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -172,9 +172,9 @@
     }
     .seg-btn {
       flex: 1; border: none; background: transparent;
-      padding: 8px 6px; font-size: 11px; font-weight: 500;
+      padding: 8px 4px; font-size: 11px; font-weight: 500;
       color: var(--text2); border-radius: 7px; cursor: pointer;
-      transition: all .15s;
+      transition: all .15s; text-align: center;
     }
     .seg-btn.active {
       background: var(--surface); color: var(--blue);
@@ -193,7 +193,7 @@
     /* Buttons */
     .btn {
       display: flex; align-items: center; justify-content: center; gap: 7px;
-      width: 100%; padding: 11px 14px; font-size: 13px; font-weight: 600;
+      width: 100%; padding: 10px 14px; font-size: 12px; font-weight: 600;
       border-radius: 22px; border: none; cursor: pointer;
       transition: all .15s;
     }
@@ -216,8 +216,8 @@
     .status-bar.err { color: #EA4335; }
 
     /* VIEWPORT */
-    .viewport { flex: 1; position: relative; touch-action: none; }
-    #canvas3d { width: 100%; height: 100%; display: block; touch-action: none; }
+    .viewport { flex: 1; position: relative; }
+    #canvas3d { width: 100%; height: 100%; display: block; }
     .v-overlay {
       position: absolute; bottom: 16px; right: 16px;
       display: flex; gap: 8px; z-index: 10;
@@ -229,6 +229,15 @@
       box-shadow: var(--shadow); cursor: pointer; transition: all .15s;
     }
     .v-btn:hover { color: var(--blue); box-shadow: var(--shadow2); }
+
+    /* Mode indicator badge on viewport */
+    .mode-badge {
+      position: absolute; top: 16px; right: 16px;
+      background: var(--surface); border: 1px solid var(--border);
+      padding: 6px 14px; border-radius: 20px; font-size: 12px; font-weight: 600;
+      color: var(--blue); box-shadow: var(--shadow); z-index: 10;
+      display: flex; align-items: center; gap: 6px;
+    }
 
     #loading {
       position: absolute; inset: 0;
@@ -308,7 +317,7 @@
   <!-- WORKSPACE -->
   <div class="workspace">
 
-    <!-- BACKDROP & FLOATING MENU FOR MOBILE -->
+    <!-- FLOATING MENU BUTTON & BACKDROP FOR MOBILE -->
     <button class="fab-menu" id="btn-toggle-menu" aria-label="Toggle Controls">
       ⚙️ Controls
     </button>
@@ -322,21 +331,43 @@
         <button class="btn-close-mobile" id="btn-close-sidebar" aria-label="Close">✕</button>
       </div>
 
+      <!-- CARD 1: PATTERN & SEED EDITING -->
       <div class="card">
-        <div class="card-label">Pattern &amp; Blending</div>
+        <div class="card-label">Pattern &amp; Seed Editing</div>
+        
+        <div class="ctrl">
+          <div class="lrow" style="margin-bottom:5px">Pointer Mode</div>
+          <div class="seg" id="seg-mouse-mode">
+            <button class="seg-btn active" data-v="navigate">3D View</button>
+            <button class="seg-btn" data-v="add">Add</button>
+            <button class="seg-btn" data-v="move">Move</button>
+            <button class="seg-btn" data-v="delete">Remove</button>
+          </div>
+        </div>
+
         <div class="ctrl">
           <div class="lrow"><span>Seed Count</span><span class="lval" id="v-seeds">30</span></div>
-          <input type="range" id="s-seeds" min="10" max="80" value="30" step="1">
+          <input type="range" id="s-seeds" min="8" max="90" value="30" step="1">
         </div>
+        
         <div class="ctrl">
           <div class="lrow"><span>Honeycomb Blend</span><span class="lval" id="v-blend">50%</span></div>
           <input type="range" id="s-blend" min="0" max="1" value="0.5" step="0.05">
         </div>
+        
+        <div class="ctrl">
+          <label style="display:flex; align-items:center; gap:8px; font-size:12px; font-weight:500; cursor:pointer; color:var(--text2);">
+            <input type="checkbox" id="chk-show-seeds" checked />
+            <span>Show Seed Point Spheres</span>
+          </label>
+        </div>
+
         <div class="ctrl">
           <button class="btn btn-outline" id="btn-rand">🎲 Resample Poisson Seeds</button>
         </div>
       </div>
 
+      <!-- CARD 2: 3D GEOMETRY -->
       <div class="card">
         <div class="card-label">3D Geometry</div>
         <div class="ctrl">
@@ -357,6 +388,7 @@
         </div>
       </div>
 
+      <!-- CARD 3: STYLES & COLOR -->
       <div class="card">
         <div class="card-label">Style &amp; Mode</div>
         <div class="ctrl">
@@ -379,11 +411,15 @@
         </div>
       </div>
 
+      <!-- CARD 4: EXPORT & SEED DATA -->
       <div class="card">
-        <div class="card-label">Export</div>
+        <div class="card-label">Export &amp; Seed JSON</div>
         <div class="btn-group">
           <button class="btn btn-blue" id="btn-stl">📥 Export STL (3D Printing)</button>
           <button class="btn btn-light" id="btn-svg">📄 Export SVG (Laser Cut)</button>
+          <button class="btn btn-outline" id="btn-export-seeds">💾 Export Seeds (JSON)</button>
+          <button class="btn btn-outline" id="btn-import-seeds">📂 Import Seeds (JSON)</button>
+          <input type="file" id="inp-file-seeds" accept=".json" style="display:none;" />
         </div>
         <div class="status-bar" id="status">Ready</div>
       </div>
@@ -392,6 +428,9 @@
 
     <!-- 3D VIEWPORT -->
     <div class="viewport">
+      <div class="mode-badge" id="badge-pointer-mode">
+        <span>📍 Mode: 3D View</span>
+      </div>
       <canvas id="canvas3d"></canvas>
       <div id="loading">
         <div class="spinner"></div>
@@ -420,9 +459,12 @@
       blend: 0.5,
       mode: 'walls',
       curve: 'fillet',
-      color: '#4285F4'
+      color: '#4285F4',
+      pointerMode: 'navigate', // 'navigate', 'add', 'move', 'delete'
+      showSeeds: true
     };
 
+    var currentSeeds = [];
     var cellPolygons = [];
 
     // ── THREE.JS SCENE SETUP ─────────────────────────────────
@@ -444,7 +486,7 @@
     var controls = new THREE.OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
     controls.dampingFactor = 0.05;
-    controls.enableTouch = true; // Touch gesture support (pinch zoom & rotate)
+    controls.enableTouch = true;
 
     // Lighting
     scene.add(new THREE.AmbientLight(0xffffff, 0.7));
@@ -462,6 +504,8 @@
     scene.add(grid);
 
     var currentMesh = null;
+    var seedSpheresGroup = new THREE.Group();
+    scene.add(seedSpheresGroup);
 
     function resetCamera() {
       var d = Math.max(cfg.w, cfg.h) * 1.6;
@@ -741,6 +785,39 @@
     }
 
     // ─────────────────────────────────────────────────────────
+    // SEED POINT SPHERES VISUALIZER
+    // ─────────────────────────────────────────────────────────
+
+    function updateSeedSpheres() {
+      // Clear old spheres
+      while (seedSpheresGroup.children.length > 0) {
+        var child = seedSpheresGroup.children.pop();
+        if (child.geometry) child.geometry.dispose();
+        if (child.material) child.material.dispose();
+      }
+
+      if (!cfg.showSeeds) return;
+
+      var sphereGeom = new THREE.SphereGeometry(2.2, 16, 16);
+      var sphereMat = new THREE.MeshStandardMaterial({
+        color: 0xFF5252,
+        roughness: 0.2,
+        metalness: 0.2,
+        emissive: 0x330000
+      });
+
+      var topY = cfg.depth / 2.0 + 1.2;
+
+      for (var i = 0; i < currentSeeds.length; i++) {
+        var s = currentSeeds[i];
+        var mesh = new THREE.Mesh(sphereGeom, sphereMat);
+        mesh.position.set(s.x - cfg.w / 2, topY, s.y - cfg.h / 2);
+        mesh.userData = { seedIndex: i };
+        seedSpheresGroup.add(mesh);
+      }
+    }
+
+    // ─────────────────────────────────────────────────────────
     // 3D EXTRUSION BUILDER (WATERTIGHT & BUG-FREE)
     // ─────────────────────────────────────────────────────────
 
@@ -838,6 +915,8 @@
       currentMesh.castShadow = true;
       currentMesh.receiveShadow = true;
       scene.add(currentMesh);
+
+      updateSeedSpheres();
     }
 
     // ─────────────────────────────────────────────────────────
@@ -850,12 +929,16 @@
       el.className = 'status-bar' + (cls ? ' ' + cls : '');
     }
 
-    function rebuild() {
+    function generateAndBuildSeeds() {
+      currentSeeds = generateHybridSeeds();
+      rebuildFromCurrentSeeds();
+    }
+
+    function rebuildFromCurrentSeeds() {
       setStatus('Generating 3D model…');
       setTimeout(function() {
         try {
-          var seeds = generateHybridSeeds();
-          var rawCells = computeVoronoiCells(seeds);
+          var rawCells = computeVoronoiCells(currentSeeds);
 
           var halfGap = cfg.spacing / 2.0;
           var polys = [];
@@ -873,12 +956,139 @@
           cellPolygons = polys;
           build3D(polys);
 
-          setStatus('✓ Generated ' + polys.length + ' clean 3D cells', 'ok');
+          document.getElementById('v-seeds').textContent = currentSeeds.length;
+          setStatus('✓ Generated ' + polys.length + ' clean cells (' + currentSeeds.length + ' seeds)', 'ok');
         } catch (e) {
           setStatus('Error: ' + e.message, 'err');
           console.error(e);
         }
       }, 20);
+    }
+
+    // ─────────────────────────────────────────────────────────
+    // INTERACTIVE SEED RAYCASTING & MOUSE EDITING
+    // ─────────────────────────────────────────────────────────
+
+    var raycaster = new THREE.Raycaster();
+    var mouse = new THREE.Vector2();
+    var isDraggingSeed = false;
+    var draggedSeedIndex = -1;
+
+    // Ground plane corresponding to top surface of panel
+    var planePlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), -cfg.depth / 2.0);
+
+    function getPlaneIntersection(e) {
+      var rect = canvas.getBoundingClientRect();
+      mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+      mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+
+      raycaster.setFromCamera(mouse, camera);
+      var target = new THREE.Vector3();
+      if (raycaster.ray.intersectPlane(planePlane, target)) {
+        return {
+          x: target.x + cfg.w / 2,
+          y: target.z + cfg.h / 2
+        };
+      }
+      return null;
+    }
+
+    function getIntersectedSeed(e) {
+      var rect = canvas.getBoundingClientRect();
+      mouse.x = ((e.clientX - rect.left) / rect.width) * 2 - 1;
+      mouse.y = -((e.clientY - rect.top) / rect.height) * 2 + 1;
+
+      raycaster.setFromCamera(mouse, camera);
+      var intersects = raycaster.intersectObjects(seedSpheresGroup.children);
+      if (intersects.length > 0) {
+        return intersects[0].object.userData.seedIndex;
+      }
+      return -1;
+    }
+
+    canvas.addEventListener('pointerdown', function(e) {
+      if (cfg.pointerMode === 'navigate') return;
+
+      var seedIdx = getIntersectedSeed(e);
+
+      if (cfg.pointerMode === 'delete') {
+        if (seedIdx !== -1) {
+          currentSeeds.splice(seedIdx, 1);
+          rebuildFromCurrentSeeds();
+        }
+      } else if (cfg.pointerMode === 'add') {
+        var pt = getPlaneIntersection(e);
+        if (pt && pt.x >= 5 && pt.x <= cfg.w - 5 && pt.y >= 5 && pt.y <= cfg.h - 5) {
+          currentSeeds.push(pt);
+          rebuildFromCurrentSeeds();
+        }
+      } else if (cfg.pointerMode === 'move') {
+        if (seedIdx !== -1) {
+          isDraggingSeed = true;
+          draggedSeedIndex = seedIdx;
+          controls.enabled = false; // Disable orbit camera while dragging
+        }
+      }
+    });
+
+    canvas.addEventListener('pointermove', function(e) {
+      if (isDraggingSeed && draggedSeedIndex !== -1) {
+        var pt = getPlaneIntersection(e);
+        if (pt) {
+          currentSeeds[draggedSeedIndex] = {
+            x: Math.max(2, Math.min(cfg.w - 2, pt.x)),
+            y: Math.max(2, Math.min(cfg.h - 2, pt.y))
+          };
+          rebuildFromCurrentSeeds();
+        }
+      }
+    });
+
+    window.addEventListener('pointerup', function() {
+      if (isDraggingSeed) {
+        isDraggingSeed = false;
+        draggedSeedIndex = -1;
+        if (cfg.pointerMode === 'navigate') controls.enabled = true;
+      }
+    });
+
+    // ─────────────────────────────────────────────────────────
+    // JSON SEED IMPORT & EXPORT
+    // ─────────────────────────────────────────────────────────
+
+    function exportSeedsJSON() {
+      if (!currentSeeds.length) { setStatus('No seeds to export', 'err'); return; }
+      var json = JSON.stringify(currentSeeds, null, 2);
+      var blob = new Blob([json], { type: 'application/json' });
+      var a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'voronoi_seeds.json';
+      a.click();
+      URL.revokeObjectURL(a.href);
+      setStatus('Seeds exported as JSON!', 'ok');
+    }
+
+    function importSeedsJSON(e) {
+      var file = e.target.files[0];
+      if (!file) return;
+      var reader = new FileReader();
+      reader.onload = function(evt) {
+        try {
+          var parsed = JSON.parse(evt.target.result);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            currentSeeds = parsed.map(function(p) {
+              return { x: parseFloat(p.x || 0), y: parseFloat(p.y || 0) };
+            });
+            rebuildFromCurrentSeeds();
+            setStatus('Imported ' + currentSeeds.length + ' seeds from JSON!', 'ok');
+          } else {
+            setStatus('Invalid seed JSON file', 'err');
+          }
+        } catch (err) {
+          setStatus('JSON parse error: ' + err.message, 'err');
+        }
+      };
+      reader.readAsText(file);
     }
 
     // ─────────────────────────────────────────────────────────
@@ -962,7 +1172,7 @@
     }
 
     // ─────────────────────────────────────────────────────────
-    // MOBILE DRAWER HANDLERS & UI BINDINGS
+    // MOBILE DRAWER & UI BINDINGS
     // ─────────────────────────────────────────────────────────
 
     var sidebar = document.getElementById('sidebar');
@@ -990,7 +1200,11 @@
         var v = parseFloat(sl.value);
         cfg[cfgKey] = v;
         if (vl) vl.textContent = fmt(v);
-        rebuild();
+        if (cfgKey === 'seeds') {
+          generateAndBuildSeeds();
+        } else {
+          rebuildFromCurrentSeeds();
+        }
       });
     }
 
@@ -1008,26 +1222,50 @@
           btns.forEach(function(b) { b.classList.remove('active'); });
           btn.classList.add('active');
           cfg[cfgKey] = btn.getAttribute('data-v');
-          rebuild();
+          
+          if (cfgKey === 'pointerMode') {
+            var modeLabels = {
+              'navigate': '📍 Mode: 3D View',
+              'add': '➕ Mode: Click to Add Seed',
+              'move': '✋ Mode: Drag Seed Sphere',
+              'delete': '❌ Mode: Click to Remove Seed'
+            };
+            document.getElementById('badge-pointer-mode').textContent = modeLabels[cfg.pointerMode] || '📍 Mode: 3D View';
+            controls.enabled = (cfg.pointerMode === 'navigate');
+          } else {
+            rebuildFromCurrentSeeds();
+          }
         });
       });
     }
+    makeSeg('seg-mouse-mode', 'pointerMode');
     makeSeg('seg-mode', 'mode');
     makeSeg('seg-curve', 'curve');
+
+    document.getElementById('chk-show-seeds').addEventListener('change', function() {
+      cfg.showSeeds = this.checked;
+      updateSeedSpheres();
+    });
 
     document.getElementById('inp-color').addEventListener('input', function() {
       cfg.color = this.value;
       if (currentMesh && currentMesh.material) currentMesh.material.color.set(cfg.color);
     });
 
-    document.getElementById('btn-rand').addEventListener('click', rebuild);
+    document.getElementById('btn-rand').addEventListener('click', generateAndBuildSeeds);
     document.getElementById('btn-reset').addEventListener('click', resetCamera);
     document.getElementById('btn-stl').addEventListener('click', exportSTL);
     document.getElementById('btn-svg').addEventListener('click', exportSVG);
 
+    document.getElementById('btn-export-seeds').addEventListener('click', exportSeedsJSON);
+    document.getElementById('btn-import-seeds').addEventListener('click', function() {
+      document.getElementById('inp-file-seeds').click();
+    });
+    document.getElementById('inp-file-seeds').addEventListener('change', importSeedsJSON);
+
     // INITIALIZATION
     document.getElementById('loading').style.display = 'none';
-    rebuild();
+    generateAndBuildSeeds();
 
   })();
   </script>
