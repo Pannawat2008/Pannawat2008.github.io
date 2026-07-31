@@ -398,18 +398,17 @@
       seeds: 50,
       spacing: 4.0,
       depth: 12,
-      density: 0.6,      // 0 = uniform hex, 1 = max tiny center voronoi
+      density: 0.6,
       mode: 'walls',
       curve: 'fillet',
       color: '#4285F4',
-      shape: 'rect',     // 'rect' or 'blob'
+      shape: 'rect',
       pointerMode: 'navigate',
       showSeeds: true
     };
 
     var currentSeeds = [];
     var cellPolygons = [];
-    var clippedPolygons = [];
 
     // ─── THREE.JS ────────────────────────────────────────────
     var canvas = document.getElementById('canvas3d');
@@ -425,10 +424,17 @@
     renderer.setSize(W, H);
 
     var camera = new THREE.PerspectiveCamera(45, W / H, 1, 5000);
-    resetCamera();
 
     var controls = new THREE.OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true; controls.dampingFactor = 0.05; controls.enableTouch = true;
+
+    function resetCamera() {
+      var d = Math.max(cfg.w, cfg.h) * 1.5;
+      camera.position.set(0, d * 0.9, d * 1.2);
+      camera.lookAt(0, 0, 0);
+      if (controls) { controls.target.set(0, 0, 0); controls.update(); }
+    }
+    resetCamera();
 
     scene.add(new THREE.AmbientLight(0xffffff, 0.7));
     var sun = new THREE.DirectionalLight(0xffffff, 0.85);
@@ -442,13 +448,6 @@
     var currentMesh = null;
     var seedSpheresGroup = new THREE.Group();
     scene.add(seedSpheresGroup);
-
-    function resetCamera() {
-      var d = Math.max(cfg.w, cfg.h) * 1.6;
-      camera.position.set(0, d * 1.3, d * 0.8);
-      camera.lookAt(0, 0, 0);
-      if (controls) { controls.target.set(0, 0, 0); controls.update(); }
-    }
 
     (function animLoop(){ requestAnimationFrame(animLoop); controls.update(); renderer.render(scene, camera); })();
 
@@ -477,171 +476,130 @@
       var out=[];
       for(var i=0;i<pts.length;i++){
         var n=pts[(i+1)%pts.length];
-        if(dist(pts[i],n)>0.3) out.push(pts[i]);
+        if(dist(pts[i],n)>0.4) out.push(pts[i]);
       }
       return out;
     }
     function ensureCCW(pts){ if(polygonArea(pts)<0) return pts.slice().reverse(); return pts; }
     function ensureCW(pts){ if(polygonArea(pts)>0) return pts.slice().reverse(); return pts; }
 
-    // ─── ORGANIC BLOB SHAPE ───────────────────────────────────
-    function getBlobPoints(cx, cy, rx, ry, bumpAmp, bumpFreq, N) {
+    function getCentroid(pts) {
+      var cx = 0, cy = 0;
+      for (var i = 0; i < pts.length; i++) { cx += pts[i].x; cy += pts[i].y; }
+      return { x: cx / pts.length, y: cy / pts.length };
+    }
+
+    // ─── ORGANIC BLOB BOUNDS ─────────────────────────────────
+    function getBlobBounds() {
+      var cx = cfg.w / 2, cy = cfg.h / 2;
+      var rx = cfg.w * 0.44, ry = cfg.h * 0.43;
+      var bumpAmp = 0.08, bumpFreq = 3;
+      return { cx: cx, cy: cy, rx: rx, ry: ry, bumpAmp: bumpAmp, bumpFreq: bumpFreq };
+    }
+
+    function getBlobPoints(N) {
+      var b = getBlobBounds();
       var pts = [];
       for (var i = 0; i < N; i++) {
         var angle = (i / N) * Math.PI * 2;
-        var bump = 1 + bumpAmp * Math.sin(bumpFreq * angle + 0.5);
+        var bump = 1 + b.bumpAmp * Math.sin(b.bumpFreq * angle + 0.5);
         pts.push({
-          x: cx + rx * bump * Math.cos(angle),
-          y: cy + ry * bump * Math.sin(angle)
+          x: b.cx + b.rx * bump * Math.cos(angle),
+          y: b.cy + b.ry * bump * Math.sin(angle)
         });
       }
       return pts;
     }
 
-    function pointInBlob(p, cx, cy, rx, ry, bumpAmp, bumpFreq) {
-      var dx = p.x - cx, dy = p.y - cy;
-      var angle = Math.atan2(dy, dx);
-      var bump = 1 + bumpAmp * Math.sin(bumpFreq * angle + 0.5);
-      var normR = Math.sqrt((dx / (rx * bump)) * (dx / (rx * bump)) + (dy / (ry * bump)) * (dy / (ry * bump)));
-      return normR <= 1.0;
-    }
-
-    function getBlobBounds() {
-      var cx = cfg.w / 2, cy = cfg.h / 2;
-      var rx = cfg.w * 0.46, ry = cfg.h * 0.45;
-      var bumpAmp = 0.07, bumpFreq = 3;
-      return { cx: cx, cy: cy, rx: rx, ry: ry, bumpAmp: bumpAmp, bumpFreq: bumpFreq };
-    }
-
-    // ─── SUTHERLAND-HODGMAN POLYGON CLIP ────────────────────
-    function clipPolyByHalfPlane(poly, ax, ay, bx, by) {
-      // Clips poly to left side of directed edge (ax,ay)->(bx,by)
-      var out = [];
-      var n = poly.length;
-      if (n === 0) return out;
-      for (var i = 0; i < n; i++) {
-        var c = poly[i], d = poly[(i+1)%n];
-        var cIn = (bx-ax)*(c.y-ay) - (by-ay)*(c.x-ax) >= 0;
-        var dIn = (bx-ax)*(d.y-ay) - (by-ay)*(d.x-ax) >= 0;
-        if (cIn) out.push(c);
-        if (cIn !== dIn) {
-          // Intersection
-          var t = ((ax-c.x)*(ay-by)-(ay-c.y)*(ax-bx)) / ((c.x-d.x)*(ay-by)-(c.y-d.y)*(ax-bx));
-          if (isFinite(t)) out.push({ x: c.x + t*(d.x-c.x), y: c.y + t*(d.y-c.y) });
-        }
-      }
-      return out;
-    }
-
-    function clipPolyToBlob(poly) {
+    function pointInBlob(p) {
       var b = getBlobBounds();
-      var blobPts = getBlobPoints(b.cx, b.cy, b.rx, b.ry, b.bumpAmp, b.bumpFreq, 64);
-      var clipped = poly.slice();
-      for (var i = 0; i < blobPts.length; i++) {
-        if (clipped.length === 0) break;
-        var p1 = blobPts[i], p2 = blobPts[(i+1)%blobPts.length];
-        clipped = clipPolyByHalfPlane(clipped, p1.x, p1.y, p2.x, p2.y);
-      }
-      return clipped;
+      var dx = p.x - b.cx, dy = p.y - b.cy;
+      var angle = Math.atan2(dy, dx);
+      var bump = 1 + b.bumpAmp * Math.sin(b.bumpFreq * angle + 0.5);
+      var maxDist = Math.sqrt(Math.pow(b.rx * bump * Math.cos(angle), 2) + Math.pow(b.ry * bump * Math.sin(angle), 2));
+      return Math.sqrt(dx * dx + dy * dy) <= maxDist;
     }
 
-    function clipPolyToRect(poly) {
-      var w = cfg.w, h = cfg.h;
-      var clipped = poly;
-      clipped = clipPolyByHalfPlane(clipped, 0,0, w,0);
-      clipped = clipPolyByHalfPlane(clipped, w,0, w,h);
-      clipped = clipPolyByHalfPlane(clipped, w,h, 0,h);
-      clipped = clipPolyByHalfPlane(clipped, 0,h, 0,0);
-      return clipped;
+    function clampPointToShape(p) {
+      if (cfg.shape === 'blob') {
+        var b = getBlobBounds();
+        var dx = p.x - b.cx, dy = p.y - b.cy;
+        var d = Math.sqrt(dx * dx + dy * dy);
+        if (d < 1e-5) return { x: p.x, y: p.y };
+        var angle = Math.atan2(dy, dx);
+        var bump = 1 + b.bumpAmp * Math.sin(b.bumpFreq * angle + 0.5);
+        var maxDist = Math.sqrt(Math.pow(b.rx * bump * Math.cos(angle), 2) + Math.pow(b.ry * bump * Math.sin(angle), 2)) - 2;
+        if (d > maxDist) {
+          return { x: b.cx + maxDist * Math.cos(angle), y: b.cy + maxDist * Math.sin(angle) };
+        }
+        return { x: p.x, y: p.y };
+      } else {
+        return {
+          x: Math.max(2, Math.min(cfg.w - 2, p.x)),
+          y: Math.max(2, Math.min(cfg.h - 2, p.y))
+        };
+      }
     }
 
     // ─── SEED GENERATION ─────────────────────────────────────
-    function poissonSeeds(count, w, h) {
-      var seeds = [], k = 25;
-      for (var i = 0; i < count; i++) {
-        var best = null, bmd = -1;
-        for (var s = 0; s < k; s++) {
-          var c = { x: 5 + Math.random()*(w-10), y: 5 + Math.random()*(h-10) };
-          var md = Math.min(c.x, c.y, w-c.x, h-c.y);
-          for (var j = 0; j < seeds.length; j++) { var d=dist(c,seeds[j]); if(d<md) md=d; }
-          if (md > bmd) { bmd = md; best = c; }
-        }
-        if (best) seeds.push(best);
-      }
-      return seeds;
-    }
-
     function hexSeeds(w, h, r) {
       var seeds = [];
       var dx = r * Math.sqrt(3), dy = r * 1.5;
-      var cols = Math.ceil(w/dx)+1, rows = Math.ceil(h/dy)+1;
-      for (var row = 0; row < rows; row++) {
-        var xOff = (row%2!==0) ? dx/2 : 0;
-        for (var col = 0; col < cols; col++) {
-          var x = col*dx+xOff, y = row*dy;
-          if (x>=0&&x<=w&&y>=0&&y<=h) seeds.push({x:x, y:y});
+      var cols = Math.ceil(w/dx)+2, rows = Math.ceil(h/dy)+2;
+      for (var row = -1; row < rows; row++) {
+        var xOff = (row % 2 !== 0) ? dx/2 : 0;
+        for (var col = -1; col < cols; col++) {
+          var x = col*dx + xOff, y = row*dy;
+          if (x >= -5 && x <= w+5 && y >= -5 && y <= h+5) seeds.push({x:x, y:y});
         }
       }
       return seeds;
     }
 
-    // Density-gradient hybrid: large hex cells outside, tiny Voronoi in center
-    // density=0 → all uniform hex; density=1 → tiny packed center, large hex edge
     function buildHybridSeeds() {
       var w = cfg.w, h = cfg.h, n = cfg.seeds, dens = cfg.density;
       var cx = w/2, cy = h/2;
       var maxR = Math.min(w, h) * 0.5;
 
-      // Generate base hex grid (sparse = outer scale)
       var area = w * h;
-      var hexR = Math.sqrt((2*area) / (3*Math.sqrt(3)*n));
+      var hexR = Math.sqrt((2 * area) / (3 * Math.sqrt(3) * n));
       var hexList = hexSeeds(w, h, hexR);
 
-      // Filter to inside shape
+      var finalSeeds = [];
       var inShape = function(p) {
-        if (cfg.shape === 'blob') {
-          var b = getBlobBounds();
-          return pointInBlob(p, b.cx, b.cy, b.rx, b.ry, b.bumpAmp, b.bumpFreq);
-        }
-        return p.x >= 1 && p.x <= w-1 && p.y >= 1 && p.y <= h-1;
+        if (cfg.shape === 'blob') return pointInBlob(p);
+        return p.x >= 2 && p.x <= w-2 && p.y >= 2 && p.y <= h-2;
       };
 
-      var finalSeeds = [];
-
-      // Outer ring: keep hex seeds far from center
+      // Outer ring: regular hex grid
       for (var i = 0; i < hexList.length; i++) {
         var p = hexList[i];
         if (!inShape(p)) continue;
         var d = dist(p, {x:cx, y:cy});
-        var norm = d / maxR;        // 0=center, 1=edge
-        var keepProb = smoothstep(0.0, 1.0 - dens * 0.5, norm);
+        var norm = d / maxR;
+        var keepProb = smoothstep(0.1, 1.0 - dens * 0.4, norm);
         if (Math.random() < keepProb) finalSeeds.push(p);
       }
 
-      // Inner Voronoi seeds: tiny Poisson packed toward center
-      var innerCount = Math.round(n * dens * 1.8);
-      var r2 = maxR * (1.0 - dens * 0.5);
+      // Inner dense Voronoi center
+      var innerCount = Math.round(n * dens * 1.5);
+      var r2 = maxR * (1.0 - dens * 0.4);
       var innerSeeds = [];
-      var k2 = 30;
       for (var i = 0; i < innerCount; i++) {
         var best = null, bmd = -1;
-        for (var s = 0; s < k2; s++) {
+        for (var s = 0; s < 25; s++) {
           var angle = Math.random() * Math.PI * 2;
-          var radius = Math.random() * r2 * 0.9;
+          var radius = Math.random() * r2 * 0.85;
           var c = { x: cx + radius*Math.cos(angle), y: cy + radius*Math.sin(angle) };
           if (!inShape(c)) continue;
-          var md = dist(c, {x:cx,y:cy});
-          for (var j = 0; j < innerSeeds.length; j++) { var dd=dist(c,innerSeeds[j]); if(dd<md) md=dd; }
+          var md = dist(c, {x:cx, y:cy});
+          for (var j = 0; j < innerSeeds.length; j++) { var dd=dist(c, innerSeeds[j]); if(dd<md) md=dd; }
           if (md > bmd) { bmd = md; best = c; }
         }
         if (best) innerSeeds.push(best);
       }
 
-      // Blend: scale inner seeds to be denser (closer together)
-      var hexRInner = hexR * (1.0 - dens * 0.7);
-      for (var i = 0; i < innerSeeds.length; i++) {
-        finalSeeds.push(innerSeeds[i]);
-      }
+      for (var i = 0; i < innerSeeds.length; i++) finalSeeds.push(innerSeeds[i]);
 
       if (finalSeeds.length < 4) finalSeeds = hexList.filter(inShape);
       return finalSeeds;
@@ -649,8 +607,7 @@
 
     // ─── VORONOI CELLS ───────────────────────────────────────
     function computeVoronoiCells(seeds) {
-      var margin = 5;
-      var bbox = { xl: -margin, xr: cfg.w+margin, yt: -margin, yb: cfg.h+margin };
+      var bbox = { xl: 0, xr: cfg.w, yt: 0, yb: cfg.h };
       var voronoi = new Voronoi();
       var diagram = voronoi.compute(seeds, bbox);
       var cells = [];
@@ -669,43 +626,48 @@
       return cells;
     }
 
-    // ─── POLYGON OFFSET / RETRACT ────────────────────────────
-    function offsetSeg(v1, v2, d) {
-      var dx=v2.x-v1.x, dy=v2.y-v1.y, len=Math.sqrt(dx*dx+dy*dy);
-      if(len<1e-7) return {v1:{x:v1.x,y:v1.y},v2:{x:v2.x,y:v2.y}};
-      var nx=-dy/len*d, ny=dx/len*d;
-      return {v1:{x:v1.x+nx,y:v1.y+ny},v2:{x:v2.x+nx,y:v2.y+ny}};
-    }
-    function lineIntersect(s1,s2){
-      var x1=s1.v1.x,y1=s1.v1.y,x2=s1.v2.x,y2=s1.v2.y;
-      var x3=s2.v1.x,y3=s2.v1.y,x4=s2.v2.x,y4=s2.v2.y;
-      var denom=(x1-x2)*(y3-y4)-(y1-y2)*(x3-x4);
-      if(Math.abs(denom)<1e-8) return null;
-      var px=((x1*y2-y1*x2)*(x3-x4)-(x1-x2)*(x3*y4-y3*x4))/denom;
-      var py=((x1*y2-y1*x2)*(y3-y4)-(y1-y2)*(x3*y4-y3*x4))/denom;
-      return {x:px,y:py};
-    }
+    // ─── BULLETPROOF CENTROID RETRACTION (NO SPIKES) ─────────
     function retractPolygon(verts, d) {
       if (verts.length < 3 || d <= 0) return verts;
-      var n = verts.length, segs = [];
-      for (var i=0;i<n;i++) segs.push(offsetSeg(verts[i],verts[(i+1)%n],d));
-      var out = [];
-      for (var i=0;i<n;i++) {
-        var pt = lineIntersect(segs[(i+n-1)%n], segs[i]) || segs[i].v1;
-        out.push({x:pt.x,y:pt.y});
+      var c = getCentroid(verts);
+      var n = verts.length;
+
+      // Calculate inradius (min dist from centroid to any edge)
+      var minInradius = Infinity;
+      for (var i = 0; i < n; i++) {
+        var v1 = verts[i], v2 = verts[(i + 1) % n];
+        var dx = v2.x - v1.x, dy = v2.y - v1.y;
+        var len = Math.sqrt(dx * dx + dy * dy);
+        if (len < 1e-6) continue;
+        var edgeDist = Math.abs((v2.x - v1.x) * (c.y - v1.y) - (v2.y - v1.y) * (c.x - v1.x)) / len;
+        if (edgeDist < minInradius) minInradius = edgeDist;
       }
+
+      if (minInradius < 0.5 || minInradius === Infinity) return [];
+
+      var scale = Math.max(0.08, 1.0 - d / minInradius);
+      var out = [];
+      for (var i = 0; i < n; i++) {
+        var pt = {
+          x: c.x + (verts[i].x - c.x) * scale,
+          y: c.y + (verts[i].y - c.y) * scale
+        };
+        out.push(clampPointToShape(pt));
+      }
+
       return cleanPoly(out);
     }
+
     function applyFillets(verts) {
       if (verts.length < 3) return verts;
-      var n=verts.length, out=[], f=0.25;
-      for (var i=0;i<n;i++) {
-        var prev=verts[(i+n-1)%n], curr=verts[i], next=verts[(i+1)%n];
-        var p1={x:curr.x+(prev.x-curr.x)*f, y:curr.y+(prev.y-curr.y)*f};
-        var p2={x:curr.x+(next.x-curr.x)*f, y:curr.y+(next.y-curr.y)*f};
-        for(var s=0;s<=3;s++){
-          var t=s/3, u=1-t;
-          out.push({x:u*u*p1.x+2*u*t*curr.x+t*t*p2.x, y:u*u*p1.y+2*u*t*curr.y+t*t*p2.y});
+      var n = verts.length, out = [], f = 0.25;
+      for (var i = 0; i < n; i++) {
+        var prev = verts[(i + n - 1) % n], curr = verts[i], next = verts[(i + 1) % n];
+        var p1 = { x: curr.x + (prev.x - curr.x) * f, y: curr.y + (prev.y - curr.y) * f };
+        var p2 = { x: curr.x + (next.x - curr.x) * f, y: curr.y + (next.y - curr.y) * f };
+        for (var s = 0; s <= 3; s++) {
+          var t = s / 3, u = 1 - t;
+          out.push({ x: u * u * p1.x + 2 * u * t * curr.x + t * t * p2.x, y: u * u * p1.y + 2 * u * t * curr.y + t * t * p2.y });
         }
       }
       return cleanPoly(out);
@@ -718,7 +680,7 @@
       var pw = pane.clientWidth || 400;
       var ph = pane.clientHeight || 300;
       
-      var scale = Math.min(pw / (cfg.w + 20), ph / (cfg.h + 20));
+      var scale = Math.min((pw - 30) / cfg.w, (ph - 30) / cfg.h);
       var offX = (pw - cfg.w * scale) / 2;
       var offY = (ph - cfg.h * scale) / 2;
 
@@ -726,42 +688,38 @@
       function toSvgY(y) { return offY + y * scale; }
 
       var parts = [];
-
-      // Background
       parts.push('<rect width="' + pw + '" height="' + ph + '" fill="#ffffff"/>');
 
-      // Draw shape outline
+      // Draw outer shape frame
       if (cfg.shape === 'blob') {
-        var b = getBlobBounds();
-        var bpts = getBlobPoints(b.cx, b.cy, b.rx, b.ry, b.bumpAmp, b.bumpFreq, 64);
+        var bpts = getBlobPoints(64);
         var d = 'M ' + toSvgX(bpts[0].x).toFixed(1) + ' ' + toSvgY(bpts[0].y).toFixed(1);
         for (var i = 1; i < bpts.length; i++) {
           d += ' L ' + toSvgX(bpts[i].x).toFixed(1) + ' ' + toSvgY(bpts[i].y).toFixed(1);
         }
         d += ' Z';
-        parts.push('<path d="' + d + '" fill="#f9f9f9" stroke="#bbb" stroke-width="1.5"/>');
+        parts.push('<path d="' + d + '" fill="#FAFAFA" stroke="#999" stroke-width="2"/>');
       } else {
-        parts.push('<rect x="' + toSvgX(0) + '" y="' + toSvgY(0) + '" width="' + (cfg.w*scale).toFixed(1) + '" height="' + (cfg.h*scale).toFixed(1) + '" fill="#f9f9f9" stroke="#bbb" stroke-width="1.5"/>');
+        parts.push('<rect x="' + toSvgX(0).toFixed(1) + '" y="' + toSvgY(0).toFixed(1) + '" width="' + (cfg.w * scale).toFixed(1) + '" height="' + (cfg.h * scale).toFixed(1) + '" fill="#FAFAFA" stroke="#999" stroke-width="2"/>');
       }
 
-      // Draw cells
-      for (var i = 0; i < clippedPolygons.length; i++) {
-        var poly = clippedPolygons[i];
+      // Draw cell polygons
+      for (var i = 0; i < cellPolygons.length; i++) {
+        var poly = cellPolygons[i];
         if (!poly || poly.length < 3) continue;
         var pd = 'M ' + toSvgX(poly[0].x).toFixed(1) + ' ' + toSvgY(poly[0].y).toFixed(1);
         for (var j = 1; j < poly.length; j++) {
           pd += ' L ' + toSvgX(poly[j].x).toFixed(1) + ' ' + toSvgY(poly[j].y).toFixed(1);
         }
         pd += ' Z';
-        parts.push('<path d="' + pd + '" fill="rgba(240,248,255,0.8)" stroke="#333" stroke-width="' + (0.8).toFixed(1) + '" stroke-linejoin="round"/>');
+        parts.push('<path d="' + pd + '" fill="#ffffff" stroke="#222" stroke-width="1.2" stroke-linejoin="round"/>');
       }
 
       // Draw seed dots
       if (cfg.showSeeds) {
         for (var i = 0; i < currentSeeds.length; i++) {
           var s = currentSeeds[i];
-          var r = scale < 1 ? 2.0 : 2.5;
-          parts.push('<circle cx="' + toSvgX(s.x).toFixed(1) + '" cy="' + toSvgY(s.y).toFixed(1) + '" r="' + r + '" fill="#111"/>');
+          parts.push('<circle cx="' + toSvgX(s.x).toFixed(1) + '" cy="' + toSvgY(s.y).toFixed(1) + '" r="2.2" fill="#111"/>');
         }
       }
 
@@ -816,12 +774,9 @@
           geoms.push(new THREE.ExtrudeGeometry(s, { depth: depth, bevelEnabled: false }));
         }
       } else {
-        // Outer shape
         var outerPts;
         if (cfg.shape === 'blob') {
-          var b = getBlobBounds();
-          outerPts = getBlobPoints(b.cx, b.cy, b.rx, b.ry, b.bumpAmp, b.bumpFreq, 64);
-          outerPts = ensureCCW(outerPts);
+          outerPts = ensureCCW(getBlobPoints(64));
         } else {
           outerPts = ensureCCW([{x:0,y:0},{x:w,y:0},{x:w,y:h},{x:0,y:h}]);
         }
@@ -872,7 +827,7 @@
       updateSeedSpheres();
     }
 
-    // ─── REBUILD ─────────────────────────────────────────────
+    // ─── REBUILD CONTROLLER ──────────────────────────────────
     function setStatus(msg, cls) {
       var el = document.getElementById('status');
       el.textContent = msg;
@@ -895,20 +850,18 @@
           for (var i = 0; i < rawCells.length; i++) {
             var cell = ensureCCW(rawCells[i]);
 
-            // Clip to shape
-            var clipped = cfg.shape === 'blob' ? clipPolyToBlob(cell) : clipPolyToRect(cell);
-            if (!clipped || clipped.length < 3) continue;
-            clipped = ensureCCW(clipped);
+            // Filter cells by shape boundary
+            var cCenter = getCentroid(cell);
+            if (cfg.shape === 'blob' && !pointInBlob(cCenter)) continue;
 
             // Retract for wall thickness
-            var ret = retractPolygon(clipped, half);
-            if (!ret || ret.length < 3 || Math.abs(polygonArea(ret)) < 15) continue;
+            var ret = retractPolygon(cell, half);
+            if (!ret || ret.length < 3 || Math.abs(polygonArea(ret)) < 10) continue;
             if (cfg.curve === 'fillet') ret = applyFillets(ret);
             polys.push(ret);
           }
 
           cellPolygons = polys;
-          clippedPolygons = polys;
           build3D(polys);
           updateSVG2D();
 
@@ -1048,7 +1001,6 @@
         d += ' Z';
         paths += '<path d="'+d+'" fill="none" stroke="#000" stroke-width="1.2"/>\n';
       }
-      // Seed dots
       for (var i=0;i<currentSeeds.length;i++) {
         paths += '<circle cx="'+currentSeeds[i].x.toFixed(2)+'" cy="'+currentSeeds[i].y.toFixed(2)+'" r="1" fill="#000"/>\n';
       }
@@ -1129,7 +1081,6 @@
     document.getElementById('loading').style.display = 'none';
     rebuildAll();
 
-    // Update SVG on panel resize
     window.addEventListener('resize', function(){ setTimeout(updateSVG2D, 100); });
 
   })();
