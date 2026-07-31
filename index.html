@@ -224,23 +224,23 @@
       <div class="card">
         <div class="card-label">Pattern &amp; Blending</div>
         <div class="ctrl">
-          <div class="lrow"><span>Seed Count</span><span class="lval" id="v-seeds">40</span></div>
-          <input type="range" id="s-seeds" min="8" max="120" value="40" step="1">
+          <div class="lrow"><span>Grid Density / Hex Size</span><span class="lval" id="v-seeds">Hex ~20mm</span></div>
+          <input type="range" id="s-seeds" min="10" max="40" value="20" step="1">
         </div>
         <div class="ctrl">
-          <div class="lrow"><span>Honeycomb Blend</span><span class="lval" id="v-blend">50%</span></div>
+          <div class="lrow"><span>Center Voronoi Radius</span><span class="lval" id="v-blend">50%</span></div>
           <input type="range" id="s-blend" min="0" max="1" value="0.5" step="0.05">
         </div>
         <div class="ctrl">
-          <button class="btn btn-outline" id="btn-rand">🎲 Randomize Seeds</button>
+          <button class="btn btn-outline" id="btn-rand">🎲 Randomize Center Voronoi</button>
         </div>
       </div>
 
       <div class="card">
         <div class="card-label">3D Geometry</div>
         <div class="ctrl">
-          <div class="lrow"><span>Cell Spacing</span><span class="lval" id="v-spacing">2.5 mm</span></div>
-          <input type="range" id="s-spacing" min="0.2" max="8" value="2.5" step="0.1">
+          <div class="lrow"><span>Wall Thickness (Spacing)</span><span class="lval" id="v-spacing">2.5 mm</span></div>
+          <input type="range" id="s-spacing" min="0.5" max="8" value="2.5" step="0.5">
         </div>
         <div class="ctrl">
           <div class="lrow"><span>Extrusion Height</span><span class="lval" id="v-depth">12 mm</span></div>
@@ -248,11 +248,11 @@
         </div>
         <div class="ctrl">
           <div class="lrow"><span>Panel Width</span><span class="lval" id="v-w">200 mm</span></div>
-          <input type="range" id="s-w" min="60" max="400" value="200" step="10">
+          <input type="range" id="s-w" min="80" max="400" value="200" step="10">
         </div>
         <div class="ctrl">
           <div class="lrow"><span>Panel Height</span><span class="lval" id="v-h">120 mm</span></div>
-          <input type="range" id="s-h" min="40" max="300" value="120" step="10">
+          <input type="range" id="s-h" min="60" max="300" value="120" step="10">
         </div>
       </div>
 
@@ -269,8 +269,8 @@
         <div class="ctrl">
           <div class="lrow" style="margin-bottom:5px">Edge Style</div>
           <div class="seg" id="seg-curve">
-            <button class="seg-btn active" data-v="bezier">Smooth</button>
-            <button class="seg-btn" data-v="straight">Linear</button>
+            <button class="seg-btn active" data-v="straight">Linear (Hex)</button>
+            <button class="seg-btn" data-v="bezier">Smooth (Curved)</button>
           </div>
         </div>
         <div class="ctrl color-row">
@@ -304,234 +304,28 @@
 
   </div>
 
-  <!-- THREE.JS from CDN (classic script, not module) -->
+  <!-- THREE.JS & DEPENDENCIES FROM CDN -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-  <!-- OrbitControls -->
   <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/rhill-voronoi-core@1.0.0/rhill-voronoi-core.min.js"></script>
 
   <script>
-  // ─────────────────────────────────────────────────────────────
-  // FORTUNE'S VORONOI — inlined minimal implementation
-  // Based on Raymond Hill's rhill-voronoi-core (MIT License)
-  // ─────────────────────────────────────────────────────────────
-  var VoronoiLib = (function () {
-    function Voronoi() {}
-    Voronoi.prototype = {
-      ε: 1e-9,
-      equalWithEpsilon: function(a,b){return Math.abs(a-b)<1e-9;},
-      greaterThanWithEpsilon:function(a,b){return a-b>1e-9;},
-      greaterThanOrEqualWithEpsilon:function(a,b){return b-a<1e-9;},
-      lessThanWithEpsilon:function(a,b){return b-a>1e-9;},
-      lessThanOrEqualWithEpsilon:function(a,b){return a-b<1e-9;},
-      reset:function(){
-        if(!this.beachline)this.beachline=new this.RBTree();
-        if(this.beachline.root){var b=this.beachline.getFirst(this.beachline.root);while(b){this.beachsectionJunkyard.push(b);b=b.rbNext;}}
-        this.beachline.root=null;
-        if(!this.circleEvents)this.circleEvents=new this.RBTree();
-        this.circleEvents.root=this.firstCircleEvent=null;
-        this.vertices=[];this.edges=[];this.cells=[];
-      },
-      compute:function(sites,bbox){
-        var me=this;
-        me.beachsectionJunkyard=me.beachsectionJunkyard||[];
-        me.vertexJunkyard=me.vertexJunkyard||[];
-        me.edgeJunkyard=me.edgeJunkyard||[];
-        me.cellJunkyard=me.cellJunkyard||[];
-        me.reset();
-        var siteEvents=sites.slice(0).sort(function(a,b){var r=b.y-a.y;return r?r:b.x-a.x;});
-        var site=siteEvents.pop(),siteid=0,xsite,ysite,circle;
-        for(;;){
-          circle=me.firstCircleEvent;
-          if(site&&(!circle||site.y<circle.y||(site.y===circle.y&&site.x<circle.x))){
-            if(site.x!==xsite||site.y!==ysite){me.cells[siteid]=me.createCell(site);site.id=siteid++;me.addBeachsection(site);ysite=site.y;xsite=site.x;}
-            site=siteEvents.pop();
-          }else if(circle){me.removeBeachsection(circle.arc);}else break;
-        }
-        me.clipEdges(bbox);me.closeCells(bbox);
-        return{cells:me.cells,edges:me.edges,vertices:me.vertices};
-      },
-      createCell:function(site){var c=this.cellJunkyard.pop();if(c){c.site=site;c.halfedges=[];}else c={site:site,halfedges:[]};return c;},
-      createVertex:function(x,y){var v=this.vertexJunkyard.pop();if(!v)v={x:x,y:y};else{v.x=x;v.y=y;}return v;},
-      createEdge:function(lS,rS,va,vb){var e=this.edgeJunkyard.pop();if(!e)e={lSite:lS,rSite:rS,va:va,vb:vb};else{e.lSite=lS;e.rSite=rS;e.va=va;e.vb=vb;}return e;},
-      createHalfedge:function(edge,lSite,rSite){
-        return{site:lSite,edge:edge,
-          angle:rSite?Math.atan2(rSite.y-lSite.y,rSite.x-lSite.x):Math.atan2(lSite.x-(edge.lSite===lSite?edge.vb:edge.va).x,-(lSite.y-(edge.lSite===lSite?edge.vb:edge.va).y)),
-          getStartpoint:function(){return this.edge.lSite===this.site?this.edge.va:this.edge.vb;},
-          getEndpoint:function(){return this.edge.lSite===this.site?this.edge.vb:this.edge.va;}};
-      },
-      addBeachsection:function(site){
-        var me=this,x=site.x,directrix=site.y,node=me.beachline.root,arc,lbArc,rbArc,dxl,dxr;
-        while(node){
-          dxl=me.leftBreakPoint(node,directrix)-x;
-          if(dxl>me.ε){node=node.rbLeft;}else{
-            dxr=x-me.rightBreakPoint(node,directrix);
-            if(dxr>me.ε){if(!node.rbRight){lbArc=node;break;}node=node.rbRight;}
-            else{if(dxl>-me.ε){lbArc=node.rbPrevious;rbArc=node;}else if(dxr>-me.ε){lbArc=node;rbArc=node.rbNext;}else{lbArc=rbArc=node;}break;}
-          }
-        }
-        var newArc=me.beachsectionJunkyard.pop();
-        if(!newArc)newArc={site:null,circleEvent:null,edge:null};
-        else{newArc.site=null;newArc.circleEvent=null;newArc.edge=null;}
-        newArc.site=site;
-        me.beachline.rbInsertSuccessor(lbArc,newArc);
-        if(!lbArc&&!rbArc)return;
-        if(lbArc===rbArc){
-          me.detachCircleEvent(lbArc);
-          rbArc=me.beachsectionJunkyard.pop();
-          if(!rbArc)rbArc={site:null,circleEvent:null,edge:null};
-          else{rbArc.site=null;rbArc.circleEvent=null;rbArc.edge=null;}
-          rbArc.site=lbArc.site;
-          me.beachline.rbInsertSuccessor(newArc,rbArc);
-          newArc.edge=rbArc.edge=me.createEdge(lbArc.site,newArc.site);
-          me.edges.push(newArc.edge);
-          me.attachCircleEvent(lbArc);
-          me.attachCircleEvent(rbArc);
-          return;
-        }
-        if(lbArc&&!rbArc){newArc.edge=me.createEdge(lbArc.site,newArc.site);me.edges.push(newArc.edge);return;}
-        if(lbArc!==rbArc){
-          me.detachCircleEvent(lbArc);me.detachCircleEvent(rbArc);
-          var lSite=lbArc.site,ax=lSite.x,ay=lSite.y,bx=site.x-ax,by=site.y-ay,rSite=rbArc.site,cx=rSite.x-ax,cy=rSite.y-ay,d=2*(bx*cy-by*cx),hb=bx*bx+by*by,hc=cx*cx+cy*cy;
-          var vertex=me.createVertex((cy*hb-by*hc)/d+ax,(bx*hc-cx*hb)/d+ay);
-          me.setEdgeStartpoint(rbArc.edge,lSite,rSite,vertex);
-          newArc.edge=me.createEdge(lSite,site,undefined,vertex);
-          me.edges.push(newArc.edge);
-          rbArc.edge=me.createEdge(site,rSite,undefined,vertex);
-          me.edges.push(rbArc.edge);
-          me.attachCircleEvent(lbArc);me.attachCircleEvent(rbArc);
-        }
-      },
-      removeBeachsection:function(arc){
-        var me=this,circle=arc.circleEvent,x=circle.x,y=circle.ycenter,vertex=me.createVertex(x,y);
-        me.vertices.push(vertex);
-        var prev=arc.rbPrevious,next=arc.rbNext;
-        me.detachCircleEvent(arc);
-        if(prev){me.detachCircleEvent(prev);prev.site=prev.site;}
-        if(next){me.detachCircleEvent(next);}
-        me.setEdgeStartpoint(arc.edge,prev?prev.site:null,next?next.site:null,vertex);
-        if(prev&&next){
-          var lSite=prev.site,rSite=next.site;
-          var edge=me.createEdge(lSite,rSite,undefined,vertex);
-          me.edges.push(edge);
-          prev.edge=edge;
-          if(prev.rbPrevious)me.attachCircleEvent(prev);
-          if(next.rbNext)me.attachCircleEvent(next);
-        }
-        me.beachline.rbRemoveNode(arc);
-        me.beachsectionJunkyard.push(arc);
-      },
-      leftBreakPoint:function(node,directrix){
-        var site=node.site,rfocx=site.x,rfocy=site.y,pby2=rfocy-directrix;
-        if(!pby2)return rfocx;
-        var lArc=node.rbPrevious;if(!lArc)return -Infinity;
-        site=lArc.site;var lfocx=site.x,lfocy=site.y,plby2=lfocy-directrix;
-        if(!plby2)return lfocx;
-        var hl=lfocx-rfocx,aby2=1/pby2-1/plby2,b=hl/plby2;
-        if(aby2)return(-b+Math.sqrt(b*b-2*aby2*(hl*hl/(-2*plby2)-lfocy+plby2/2+rfocy-pby2/2)))/aby2+rfocx;
-        return(rfocx+lfocx)/2;
-      },
-      rightBreakPoint:function(node,directrix){
-        var rArc=node.rbNext;if(rArc)return this.leftBreakPoint(rArc,directrix);
-        var site=node.site;return site.y===directrix?site.x:Infinity;
-      },
-      detachCircleEvent:function(arc){if(arc.circleEvent){if(!arc.circleEvent.rbPrevious)this.firstCircleEvent=arc.circleEvent.rbNext;this.circleEvents.rbRemoveNode(arc.circleEvent);arc.circleEvent=null;}},
-      attachCircleEvent:function(arc){
-        var me=this,lArc=arc.rbPrevious,rArc=arc.rbNext;
-        if(!lArc||!rArc)return;
-        var lSite=lArc.site,cSite=arc.site,rSite=rArc.site;
-        if(lSite===rSite)return;
-        var bx=cSite.x,by=cSite.y,ax=lSite.x-bx,ay=lSite.y-by,cx=rSite.x-bx,cy=rSite.y-by;
-        var d=2*(ax*cy-ay*cx);if(d>=-2e-12)return;
-        var ha=ax*ax+ay*ay,hc=cx*cx+cy*cy,x=(cy*ha-ay*hc)/d,y=(ax*hc-cx*ha)/d,ycenter=y+by;
-        var circleEvent={arc:arc,site:cSite,x:x+bx,y:ycenter+Math.sqrt(x*x+y*y),ycenter:ycenter};
-        arc.circleEvent=circleEvent;
-        var predecessor=null,node=me.circleEvents.root;
-        while(node){if(circleEvent.y<node.y||(circleEvent.y===node.y&&circleEvent.x<=node.x)){if(node.rbLeft)node=node.rbLeft;else{predecessor=node.rbPrevious;break;}}else{if(node.rbRight)node=node.rbRight;else{predecessor=node;break;}}}
-        me.circleEvents.rbInsertSuccessor(predecessor,circleEvent);
-        if(!predecessor)me.firstCircleEvent=circleEvent;
-      },
-      setEdgeStartpoint:function(edge,lSite,rSite,vertex){
-        if(!edge.va&&!edge.vb){edge.va=vertex;edge.lSite=lSite;edge.rSite=rSite;}
-        else if(edge.lSite===rSite)edge.vb=vertex;
-        else edge.va=vertex;
-      },
-      clipEdges:function(bbox){
-        var edges=this.edges,iEdge=edges.length,edge;
-        while(iEdge--){edge=edges[iEdge];if(!this.connectEdge(edge,bbox)||!this.clipEdge(edge,bbox)||(Math.abs(edge.va.x-edge.vb.x)<1e-9&&Math.abs(edge.va.y-edge.vb.y)<1e-9))edge.va=edge.vb=null;}
-      },
-      connectEdge:function(edge,bbox){
-        var vb=edge.vb;if(!!vb)return true;
-        var va=edge.va,xl=bbox.xl,xr=bbox.xr,yt=bbox.yt,yb=bbox.yb,lSite=edge.lSite,rSite=edge.rSite,lx=lSite.x,ly=lSite.y,rx=rSite.x,ry=rSite.y,fx=(lx+rx)/2,fy=(ly+ry)/2,fm,fb;
-        if(ry!==ly){fm=(lx-rx)/(ry-ly);fb=fy-fm*fx;}
-        if(fm===undefined){if(fx<xl||fx>=xr)return false;if(lx>rx){if(!va)va=this.createVertex(fx,yt);else if(va.y>=yb)return false;vb=this.createVertex(fx,yb);}else{if(!va)va=this.createVertex(fx,yb);else if(va.y<yt)return false;vb=this.createVertex(fx,yt);}}
-        else if(fm<-1||fm>1){if(lx>rx){if(!va)va=this.createVertex((yt-fb)/fm,yt);else if(va.y>=yb)return false;vb=this.createVertex((yb-fb)/fm,yb);}else{if(!va)va=this.createVertex((yb-fb)/fm,yb);else if(va.y<yt)return false;vb=this.createVertex((yt-fb)/fm,yt);}}
-        else{if(ly<ry){if(!va)va=this.createVertex(xl,fm*xl+fb);else if(va.x>=xr)return false;vb=this.createVertex(xr,fm*xr+fb);}else{if(!va)va=this.createVertex(xr,fm*xr+fb);else if(va.x<xl)return false;vb=this.createVertex(xl,fm*xl+fb);}}
-        edge.va=va;edge.vb=vb;return true;
-      },
-      clipEdge:function(edge,bbox){
-        var ax=edge.va.x,ay=edge.va.y,bx=edge.vb.x,by=edge.vb.y,t0=0,t1=1,dx=bx-ax,dy=by-ay,q,r;
-        q=ax-bbox.xl;if(dx===0&&q<0)return false;r=-q/dx;if(dx<0){if(r<t0)return false;if(r<t1)t1=r;}else if(dx>0){if(r>t1)return false;if(r>t0)t0=r;}
-        q=bbox.xr-ax;if(dx===0&&q<0)return false;r=q/dx;if(dx<0){if(r>t1)return false;if(r>t0)t0=r;}else if(dx>0){if(r<t0)return false;if(r<t1)t1=r;}
-        q=ay-bbox.yt;if(dy===0&&q<0)return false;r=-q/dy;if(dy<0){if(r<t0)return false;if(r<t1)t1=r;}else if(dy>0){if(r>t1)return false;if(r>t0)t0=r;}
-        q=bbox.yb-ay;if(dy===0&&q<0)return false;r=q/dy;if(dy<0){if(r>t1)return false;if(r>t0)t0=r;}else if(dy>0){if(r<t0)return false;if(r<t1)t1=r;}
-        if(t0>0)edge.va=this.createVertex(ax+t0*dx,ay+t0*dy);
-        if(t1<1)edge.vb=this.createVertex(ax+t1*dx,ay+t1*dy);
-        return true;
-      },
-      closeCells:function(bbox){
-        var xl=bbox.xl,xr=bbox.xr,yt=bbox.yt,yb=bbox.yb,cells=this.cells,iCell=cells.length,cell,iLeft,halfedges,nHalfedges,edge,va,vz;
-        while(iCell--){
-          cell=cells[iCell];if(!cell||!cell.prepareHalfedges())continue;
-          halfedges=cell.halfedges;nHalfedges=halfedges.length;iLeft=0;
-          while(iLeft<nHalfedges){
-            va=halfedges[iLeft].getEndpoint();vz=halfedges[(iLeft+1)%nHalfedges].getStartpoint();
-            if(Math.abs(va.x-vz.x)>=1e-9||Math.abs(va.y-vz.y)>=1e-9){
-              edge=null;
-              if(this.equalWithEpsilon(va.x,xl)&&this.lessThanWithEpsilon(va.y,yb))edge=this.createEdge(cell.site,null,va,this.createVertex(xl,this.equalWithEpsilon(vz.x,xl)?vz.y:yb));
-              else if(this.equalWithEpsilon(va.y,yb)&&this.lessThanWithEpsilon(va.x,xr))edge=this.createEdge(cell.site,null,va,this.createVertex(this.equalWithEpsilon(vz.y,yb)?vz.x:xr,yb));
-              else if(this.equalWithEpsilon(va.x,xr)&&this.greaterThanWithEpsilon(va.y,yt))edge=this.createEdge(cell.site,null,va,this.createVertex(xr,this.equalWithEpsilon(vz.x,xr)?vz.y:yt));
-              else if(this.equalWithEpsilon(va.y,yt)&&this.greaterThanWithEpsilon(va.x,xl))edge=this.createEdge(cell.site,null,va,this.createVertex(this.equalWithEpsilon(vz.y,yt)?vz.x:xl,yt));
-              if(edge){this.edges.push(edge);halfedges.splice(iLeft+1,0,this.createHalfedge(edge,cell.site,null));nHalfedges=halfedges.length;}
-            }
-            iLeft++;
-          }
-        }
-      },
-      RBTree:function(){this.root=null;},
-    };
-    Voronoi.prototype.RBTree=function(){this.root=null;};
-    Voronoi.prototype.RBTree.prototype={
-      rbInsertSuccessor:function(node,successor){var parent;if(node){successor.rbPrevious=node;successor.rbNext=node.rbNext;if(node.rbNext)node.rbNext.rbPrevious=successor;node.rbNext=successor;if(node.rbRight){node=node.rbRight;while(node.rbLeft)node=node.rbLeft;node.rbLeft=successor;}else node.rbRight=successor;parent=node;}else if(this.root){node=this.getFirst(this.root);successor.rbPrevious=null;successor.rbNext=node;node.rbPrevious=successor;node.rbLeft=successor;parent=node;}else{successor.rbPrevious=successor.rbNext=null;this.root=successor;parent=null;}successor.rbLeft=successor.rbRight=null;successor.rbParent=parent;successor.rbRed=true;var grandpa,uncle;node=successor;while(parent&&parent.rbRed){grandpa=parent.rbParent;if(parent===grandpa.rbLeft){uncle=grandpa.rbRight;if(uncle&&uncle.rbRed){parent.rbRed=uncle.rbRed=false;grandpa.rbRed=true;node=grandpa;}else{if(node===parent.rbRight){this.rbRotateLeft(parent);node=parent;parent=node.rbParent;}parent.rbRed=false;grandpa.rbRed=true;this.rbRotateRight(grandpa);}}else{uncle=grandpa.rbLeft;if(uncle&&uncle.rbRed){parent.rbRed=uncle.rbRed=false;grandpa.rbRed=true;node=grandpa;}else{if(node===parent.rbLeft){this.rbRotateRight(parent);node=parent;parent=node.rbParent;}parent.rbRed=false;grandpa.rbRed=true;this.rbRotateLeft(grandpa);}}parent=node.rbParent;}this.root.rbRed=false;},
-      rbRemoveNode:function(node){if(node.rbNext)node.rbNext.rbPrevious=node.rbPrevious;if(node.rbPrevious)node.rbPrevious.rbNext=node.rbNext;node.rbNext=node.rbPrevious=null;var parent=node.rbParent,left=node.rbLeft,right=node.rbRight,next;if(!left)next=right;else if(!right)next=left;else next=this.getFirst(right);if(parent){if(parent.rbLeft===node)parent.rbLeft=next;else parent.rbRight=next;}else this.root=next;var isRed;if(left&&right){isRed=next.rbRed;next.rbRed=node.rbRed;next.rbLeft=left;left.rbParent=next;if(next!==right){parent=next.rbParent;next.rbParent=node.rbParent;node=next.rbRight;parent.rbLeft=node;next.rbRight=right;right.rbParent=next;}else{next.rbParent=parent;parent=next;node=next.rbRight;}}else{isRed=node.rbRed;node=next;}if(node)node.rbParent=parent;if(isRed)return;if(node&&node.rbRed){node.rbRed=false;return;}var sibling;do{if(node===this.root)break;if(node===parent.rbLeft){sibling=parent.rbRight;if(sibling.rbRed){sibling.rbRed=false;parent.rbRed=true;this.rbRotateLeft(parent);sibling=parent.rbRight;}if((sibling.rbLeft&&sibling.rbLeft.rbRed)||(sibling.rbRight&&sibling.rbRight.rbRed)){if(!sibling.rbRight||!sibling.rbRight.rbRed){sibling.rbLeft.rbRed=false;sibling.rbRed=true;this.rbRotateRight(sibling);sibling=parent.rbRight;}sibling.rbRed=parent.rbRed;parent.rbRed=sibling.rbRight.rbRed=false;this.rbRotateLeft(parent);node=this.root;break;}}else{sibling=parent.rbLeft;if(sibling.rbRed){sibling.rbRed=false;parent.rbRed=true;this.rbRotateRight(parent);sibling=parent.rbLeft;}if((sibling.rbLeft&&sibling.rbLeft.rbRed)||(sibling.rbRight&&sibling.rbRight.rbRed)){if(!sibling.rbLeft||!sibling.rbLeft.rbRed){sibling.rbRight.rbRed=false;sibling.rbRed=true;this.rbRotateLeft(sibling);sibling=parent.rbLeft;}sibling.rbRed=parent.rbRed;parent.rbRed=sibling.rbLeft.rbRed=false;this.rbRotateRight(parent);node=this.root;break;}}sibling.rbRed=true;node=parent;parent=parent.rbParent;}while(!node.rbRed);if(node)node.rbRed=false;},
-      rbRotateLeft:function(node){var p=node,q=node.rbRight,parent=p.rbParent;if(parent){if(parent.rbLeft===p)parent.rbLeft=q;else parent.rbRight=q;}else this.root=q;q.rbParent=parent;p.rbParent=q;p.rbRight=q.rbLeft;if(p.rbRight)p.rbRight.rbParent=p;q.rbLeft=p;},
-      rbRotateRight:function(node){var p=node,q=node.rbLeft,parent=p.rbParent;if(parent){if(parent.rbLeft===p)parent.rbLeft=q;else parent.rbRight=q;}else this.root=q;q.rbParent=parent;p.rbParent=q;p.rbLeft=q.rbRight;if(p.rbLeft)p.rbLeft.rbParent=p;q.rbRight=p;},
-      getFirst:function(node){while(node.rbLeft)node=node.rbLeft;return node;},
-      getLast:function(node){while(node.rbRight)node=node.rbRight;return node;},
-    };
-    // Cell needs prepareHalfedges
-    // We'll just extract vertices from halfedges differently - skip prepareHalfedges
-    return { Voronoi: Voronoi };
-  })();
-
-  // ─────────────────────────────────────────────────────────────
-  // MAIN APP
-  // ─────────────────────────────────────────────────────────────
   (function(){
     // CONFIG
     var cfg = {
       w: 200, h: 120,
-      seeds: 40,
+      hexSize: 20, // distance between hex centers
       spacing: 2.5,
       depth: 12,
       blend: 0.5,
       mode: 'walls',
-      curve: 'bezier',
+      curve: 'straight',
       color: '#4285F4'
     };
 
     var cellPolygons = [];
 
-    // ── THREE.JS SCENE ───────────────────────────────────────
+    // ── THREE.JS SCENE SETUP ─────────────────────────────────
     var canvas = document.getElementById('canvas3d');
     var renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true });
     renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
@@ -552,18 +346,18 @@
     controls.dampingFactor = 0.05;
 
     // Lights
-    scene.add(new THREE.AmbientLight(0xffffff, 0.65));
-    var sun = new THREE.DirectionalLight(0xffffff, 0.9);
+    scene.add(new THREE.AmbientLight(0xffffff, 0.7));
+    var sun = new THREE.DirectionalLight(0xffffff, 0.85);
     sun.position.set(150, 300, 200);
     sun.castShadow = true;
     scene.add(sun);
-    var fill = new THREE.DirectionalLight(0xaaccff, 0.3);
+    var fill = new THREE.DirectionalLight(0xaaccff, 0.35);
     fill.position.set(-150, -150, -100);
     scene.add(fill);
 
-    // Grid
+    // Floor Grid
     var grid = new THREE.GridHelper(800, 40, 0xd0d0d0, 0xe8e8e8);
-    grid.position.y = -1;
+    grid.position.y = -0.5;
     scene.add(grid);
 
     var currentMesh = null;
@@ -589,412 +383,459 @@
       renderer.setSize(W, H);
     });
 
-    // ── PATTERN GENERATION ───────────────────────────────────
+    // ─────────────────────────────────────────────────────────
+    // PERFECT HEXAGONAL SEEDS & CENTER VORONOI PERTURBATION
+    // ─────────────────────────────────────────────────────────
 
-    function hexSeeds(w, h, r) {
-      var pts = [], dx = r * Math.sqrt(3), dy = r * 1.5;
-      var cols = Math.ceil(w/dx)+3, rows = Math.ceil(h/dy)+3;
-      for(var row = -1; row < rows; row++){
-        var xoff = (row%2!==0) ? dx/2 : 0;
-        var y = row * dy;
-        for(var col = -1; col < cols; col++){
-          var x = col*dx + xoff;
-          if(x >= -r && x <= w+r && y >= -r && y <= h+r)
-            pts.push({x:x, y:y});
-        }
-      }
-      return pts;
-    }
-
-    function nearestHex(p, hexPts){
-      var best = hexPts[0], bd = Infinity;
-      for(var i=0; i<hexPts.length; i++){
-        var dx = p.x-hexPts[i].x, dy = p.y-hexPts[i].y, d = dx*dx+dy*dy;
-        if(d<bd){bd=d; best=hexPts[i];}
-      }
-      return best;
-    }
-
+    function dist(a,b){ var dx=a.x-b.x, dy=a.y-b.y; return Math.sqrt(dx*dx+dy*dy); }
     function smoothstep(mn, mx, v){
       var x = Math.max(0, Math.min(1, (v-mn)/(mx-mn)));
       return x*x*(3-2*x);
     }
 
-    function lerp2(a,b,t){ return {x:a.x+(b.x-a.x)*t, y:a.y+(b.y-a.y)*t}; }
-    function dist(a,b){ var dx=a.x-b.x,dy=a.y-b.y; return Math.sqrt(dx*dx+dy*dy); }
-
+    // Seed generation: Exact hexagonal grid, perturbed in the center
     function generateSeeds(){
-      var w=cfg.w, h=cfg.h, n=cfg.seeds, blend=cfg.blend;
-      var cx=w/2, cy=h/2;
-      var maxD = Math.sqrt(cx*cx+cy*cy);
-      var area = w*h;
-      var hexR = Math.sqrt(2*area/(3*Math.sqrt(3)*n));
-      var hPts = hexSeeds(w, h, hexR);
-      var vPts = [];
-      for(var i=0;i<n;i++) vPts.push({x:Math.random()*w, y:Math.random()*h});
+      var w = cfg.w, h = cfg.h;
+      var r = cfg.hexSize;
+      var dx = r * Math.sqrt(3);
+      var dy = r * 1.5;
 
-      var inner = maxD*(1-blend)*0.35;
-      var outer = maxD*(1-blend*0.45);
+      var cols = Math.ceil(w / dx) + 4;
+      var rows = Math.ceil(h / dy) + 4;
 
-      var final = [];
+      var cx = w / 2, cy = h / 2;
+      var maxRadius = Math.min(w, h) * 0.5 * cfg.blend; // radius of Voronoi zone
 
-      // outer hex seeds
-      for(var i=0;i<hPts.length;i++){
-        var p=hPts[i], d=dist(p,{x:cx,y:cy});
-        var t=smoothstep(inner,outer,d);
-        if(t>0.25) final.push(p);
-      }
+      var seeds = [];
+      var seedId = 0;
 
-      // blended voronoi seeds
-      for(var i=0;i<vPts.length;i++){
-        var p=vPts[i], d=dist(p,{x:cx,y:cy});
-        var t=smoothstep(inner,outer,d);
-        if(t<0.85){
-          var nh=nearestHex(p,hPts);
-          final.push(lerp2(p,nh,t));
-        }
-      }
+      for (var row = -2; row < rows; row++) {
+        var xOffset = (row % 2 !== 0) ? dx / 2 : 0;
+        var y = row * dy - dy;
 
-      return final;
-    }
+        for (var col = -2; col < cols; col++) {
+          var x = col * dx + xOffset - dx;
 
-    // ── POLYGON RETRACTION ───────────────────────────────────
-    function offsetSeg(v1, v2, d){
-      var dx=v2.x-v1.x, dy=v2.y-v1.y, len=Math.sqrt(dx*dx+dy*dy);
-      if(len<1e-7) return {v1:{x:v1.x,y:v1.y},v2:{x:v2.x,y:v2.y}};
-      var nx=-dy/len*d, ny=dx/len*d;
-      return {v1:{x:v1.x+nx,y:v1.y+ny}, v2:{x:v2.x+nx,y:v2.y+ny}};
-    }
+          var d = dist({ x: x, y: y }, { x: cx, y: cy });
 
-    function lineIntersect(s1, s2){
-      var x1=s1.v1.x,y1=s1.v1.y,x2=s1.v2.x,y2=s1.v2.y;
-      var x3=s2.v1.x,y3=s2.v1.y,x4=s2.v2.x,y4=s2.v2.y;
-      var d=(x1-x2)*(y3-y4)-(y1-y2)*(x3-x4);
-      if(Math.abs(d)<1e-8) return null;
-      var t=((x1-x3)*(y3-y4)-(y1-y3)*(x3-x4))/d;
-      return {x:x1+t*(x2-x1), y:y1+t*(y2-y1)};
-    }
+          // Perturbation strength: 1.0 at center, 0.0 outside maxRadius
+          var pertFactor = 1.0 - smoothstep(0, maxRadius, d);
 
-    function retract(verts, d){
-      if(verts.length<3||d<=0) return verts;
-      var n=verts.length, segs=[];
-      for(var i=0;i<n;i++) segs.push(offsetSeg(verts[i],verts[(i+1)%n],d));
-      var out=[];
-      for(var i=0;i<n;i++){
-        var p=lineIntersect(segs[(i+n-1)%n],segs[i]);
-        out.push(p||segs[i].v1);
-      }
-      return out;
-    }
+          // Displace center seeds randomly
+          var jitterX = (Math.random() - 0.5) * r * 1.2 * pertFactor;
+          var jitterY = (Math.random() - 0.5) * r * 1.2 * pertFactor;
 
-    // ── BEZIER SMOOTHING ─────────────────────────────────────
-    function midPt(a,b){ return {x:(a.x+b.x)/2,y:(a.y+b.y)/2}; }
-
-    function smoothPoly(verts){
-      if(verts.length<3) return verts;
-      var out=[];
-      var n=verts.length;
-      for(var i=0;i<n;i++){
-        var curr=verts[i], next=verts[(i+1)%n];
-        var m1=midPt(curr,next);
-        var m0=midPt(verts[(i+n-1)%n],curr);
-        // quadratic bezier: m0 -> curr (ctrl) -> m1, 6 samples
-        for(var s=0;s<6;s++){
-          var t=s/6, u=1-t;
-          out.push({
-            x:u*u*m0.x+2*u*t*curr.x+t*t*m1.x,
-            y:u*u*m0.y+2*u*t*curr.y+t*t*m1.y
+          seeds.push({
+            id: seedId++,
+            x: x + jitterX,
+            y: y + jitterY
           });
         }
       }
-      return out;
+
+      return seeds;
     }
 
-    // ── VORONOI CELLS ────────────────────────────────────────
-    function computeCells(seeds){
-      // Use direct Voronoi from stored diagram  
-      // Fall back to simple approach: use seeds + bbox to compute diagram
-      var bbox={xl:0,xr:cfg.w,yt:0,yb:cfg.h};
-      var v=new VoronoiLib.Voronoi();
-      
+    // ─────────────────────────────────────────────────────────
+    // EXACT VORONOI COMPUTATION USING FORTUNE'S ALGORITHM
+    // ─────────────────────────────────────────────────────────
+
+    function computeVoronoiCells(seeds){
+      var bbox = { xl: -cfg.hexSize, xr: cfg.w + cfg.hexSize, yt: -cfg.hexSize, yb: cfg.h + cfg.hexSize };
+      var voronoi = new Voronoi();
+      var diagram = voronoi.compute(seeds, bbox);
+
       var polygons = [];
-      try {
-        // Since our inlined Voronoi might be unstable, use a simpler direct approach:
-        // We compute Voronoi purely geometrically using nearest-seed for each cell
-        polygons = computeVoronoiDirect(seeds, bbox);
-      } catch(e) {
-        console.warn('Voronoi error:', e);
-        polygons = fallbackHexagons(seeds);
+
+      for (var i = 0; i < diagram.cells.length; i++) {
+        var cell = diagram.cells[i];
+        if (!cell || !cell.halfedges || cell.halfedges.length < 3) continue;
+
+        // Extract counter-clockwise vertices
+        var vertices = [];
+        var valid = true;
+
+        for (var j = 0; j < cell.halfedges.length; j++) {
+          var he = cell.halfedges[j];
+          var pt = he.getStartpoint();
+          if (!pt || isNaN(pt.x) || isNaN(pt.y)) { valid = false; break; }
+          vertices.push({ x: pt.x, y: pt.y });
+        }
+
+        if (!valid || vertices.length < 3) continue;
+
+        // Keep only cells whose site is within or near panel bounding box [0, w] x [0, h]
+        var site = cell.site;
+        if (site.x >= -cfg.hexSize*0.5 && site.x <= cfg.w + cfg.hexSize*0.5 &&
+            site.y >= -cfg.hexSize*0.5 && site.y <= cfg.h + cfg.hexSize*0.5) {
+          polygons.push(vertices);
+        }
       }
+
       return polygons;
     }
 
-    // Direct Voronoi: sample a grid to find each seed's region, then extract boundaries
-    function computeVoronoiDirect(seeds, bbox){
-      var w=cfg.w, h=cfg.h;
-      var gRes = 3; // grid step size in units
-      var cols = Math.ceil(w/gRes)+1, rows = Math.ceil(h/gRes)+1;
-      
-      // For each seed, collect which grid cells belong to it
-      var ownership = new Int32Array(cols*rows);
-      for(var gy=0;gy<rows;gy++){
-        for(var gx=0;gx<cols;gx++){
-          var px=gx*gRes, py=gy*gRes;
-          var best=-1, bd=Infinity;
-          for(var i=0;i<seeds.length;i++){
-            var dx=px-seeds[i].x, dy=py-seeds[i].y, d=dx*dx+dy*dy;
-            if(d<bd){bd=d;best=i;}
-          }
-          ownership[gy*cols+gx]=best;
-        }
-      }
+    // ─────────────────────────────────────────────────────────
+    // PARALLEL EDGE RETRACTION (EVEN WALL SPACING)
+    // ─────────────────────────────────────────────────────────
 
-      // For each seed, collect boundary vertices of its region using marching squares-like approach
-      // Simpler: for each seed find its Voronoi vertices by finding intersections
-      // Even simpler: use convex hull of grid points owned by this seed
-      var regions = [];
-      for(var si=0;si<seeds.length;si++) regions.push([]);
-      for(var gy=0;gy<rows;gy++){
-        for(var gx=0;gx<cols;gx++){
-          var id=ownership[gy*cols+gx];
-          regions[id].push({x:gx*gRes, y:gy*gRes});
-        }
-      }
+    function offsetSegment(v1, v2, dist) {
+      var dx = v2.x - v1.x, dy = v2.y - v1.y;
+      var len = Math.sqrt(dx * dx + dy * dy);
+      if (len < 1e-7) return { v1: { x: v1.x, y: v1.y }, v2: { x: v2.x, y: v2.y } };
 
-      var polys=[];
-      for(var si=0;si<seeds.length;si++){
-        var pts=regions[si];
-        if(pts.length<3) continue;
-        var hull=convexHull(pts);
-        if(hull.length<3) continue;
-        polys.push(hull);
-      }
-      return polys;
+      // Inward normal (left perpendicular in CCW order)
+      var nx = -dy / len;
+      var ny = dx / len;
+
+      return {
+        v1: { x: v1.x + nx * dist, y: v1.y + ny * dist },
+        v2: { x: v2.x + nx * dist, y: v2.y + ny * dist }
+      };
     }
 
-    // Simple convex hull (Graham scan)
-    function convexHull(pts){
-      if(pts.length<3) return pts;
-      pts=pts.slice().sort(function(a,b){return a.x!==b.x?a.x-b.x:a.y-b.y;});
-      var lower=[], upper=[];
-      for(var i=0;i<pts.length;i++){
-        while(lower.length>=2&&cross(lower[lower.length-2],lower[lower.length-1],pts[i])<=0) lower.pop();
-        lower.push(pts[i]);
-      }
-      for(var i=pts.length-1;i>=0;i--){
-        while(upper.length>=2&&cross(upper[upper.length-2],upper[upper.length-1],pts[i])<=0) upper.pop();
-        upper.push(pts[i]);
-      }
-      upper.pop();lower.pop();
-      return lower.concat(upper);
-    }
-    function cross(O,A,B){return(A.x-O.x)*(B.y-O.y)-(A.y-O.y)*(B.x-O.x);}
+    function lineIntersect(s1, s2) {
+      var x1 = s1.v1.x, y1 = s1.v1.y, x2 = s1.v2.x, y2 = s1.v2.y;
+      var x3 = s2.v1.x, y3 = s2.v1.y, x4 = s2.v2.x, y4 = s2.v2.y;
 
-    function fallbackHexagons(seeds){
-      var r=Math.sqrt(cfg.w*cfg.h/seeds.length)*0.5;
-      return seeds.map(function(s){
-        var pts=[];
-        for(var i=0;i<6;i++){
-          var a=Math.PI/6+i*Math.PI/3;
-          pts.push({x:s.x+r*Math.cos(a),y:s.y+r*Math.sin(a)});
-        }
-        return pts;
-      });
+      var denom = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4);
+      if (Math.abs(denom) < 1e-8) return null;
+
+      var px = ((x1 * y2 - y1 * x2) * (x3 - x4) - (x1 - x2) * (x3 * y4 - y3 * x4)) / denom;
+      var py = ((x1 * y2 - y1 * x2) * (y3 - y4) - (y1 - y2) * (x3 * y4 - y3 * x4)) / denom;
+
+      return { x: px, y: py };
     }
 
-    // ── 3D GEOMETRY BUILDING ─────────────────────────────────
-    function build3D(polys){
-      if(currentMesh){ scene.remove(currentMesh); if(currentMesh.geometry)currentMesh.geometry.dispose(); if(currentMesh.material)currentMesh.material.dispose(); currentMesh=null; }
-      if(!polys||polys.length===0) return;
+    function retractPolygon(vertices, wallOffset) {
+      if (vertices.length < 3 || wallOffset <= 0) return vertices;
 
-      var w=cfg.w, h=cfg.h, depth=cfg.depth, mode=cfg.mode;
-      var color=new THREE.Color(cfg.color);
+      var n = vertices.length;
+      var offsetSegs = [];
 
-      var geom;
-      if(mode==='cells'){
-        // Extrude each cell polygon individually
-        var geoms=[];
-        for(var i=0;i<polys.length;i++){
-          var poly=polys[i];
-          if(poly.length<3) continue;
-          var shape=new THREE.Shape();
-          shape.moveTo(poly[0].x, poly[0].y);
-          for(var j=1;j<poly.length;j++) shape.lineTo(poly[j].x,poly[j].y);
-          shape.closePath();
-          var g=new THREE.ExtrudeGeometry(shape,{depth:depth,bevelEnabled:false});
-          geoms.push(g);
+      for (var i = 0; i < n; i++) {
+        var v1 = vertices[i];
+        var v2 = vertices[(i + 1) % n];
+        offsetSegs.push(offsetSegment(v1, v2, wallOffset));
+      }
+
+      var retracted = [];
+      for (var i = 0; i < n; i++) {
+        var seg1 = offsetSegs[(i + n - 1) % n];
+        var seg2 = offsetSegs[i];
+        var pt = lineIntersect(seg1, seg2);
+        if (pt && !isNaN(pt.x) && !isNaN(pt.y)) {
+          retracted.push(pt);
+        } else {
+          retracted.push(seg2.v1);
         }
-        if(geoms.length===0) return;
-        geom = THREE.BufferGeometryUtils ? THREE.BufferGeometryUtils.mergeGeometries(geoms) : geoms[0];
+      }
 
+      return retracted;
+    }
+
+    // ─────────────────────────────────────────────────────────
+    // BEZIER SMOOTHING
+    // ─────────────────────────────────────────────────────────
+
+    function smoothPolygon(vertices) {
+      if (vertices.length < 3) return vertices;
+      var smoothed = [];
+      var n = vertices.length;
+
+      for (var i = 0; i < n; i++) {
+        var curr = vertices[i];
+        var next = vertices[(i + 1) % n];
+        var mid = { x: (curr.x + next.x) / 2, y: (curr.y + next.y) / 2 };
+        var prev = vertices[(i + n - 1) % n];
+        var prevMid = { x: (prev.x + curr.x) / 2, y: (prev.y + curr.y) / 2 };
+
+        for (var step = 0; step < 5; step++) {
+          var t = step / 5;
+          var u = 1 - t;
+          smoothed.push({
+            x: u * u * prevMid.x + 2 * u * t * curr.x + t * t * mid.x,
+            y: u * u * prevMid.y + 2 * u * t * curr.y + t * t * mid.y
+          });
+        }
+      }
+
+      return smoothed;
+    }
+
+    // ─────────────────────────────────────────────────────────
+    // 3D EXTRUSION GEOMETRY BUILDER
+    // ─────────────────────────────────────────────────────────
+
+    function build3DGeometry(polygons) {
+      if (currentMesh) {
+        scene.remove(currentMesh);
+        if (currentMesh.geometry) currentMesh.geometry.dispose();
+        if (currentMesh.material) currentMesh.material.dispose();
+        currentMesh = null;
+      }
+
+      if (!polygons || polygons.length === 0) return;
+
+      var w = cfg.w, h = cfg.h, depth = cfg.depth, mode = cfg.mode;
+      var color = new THREE.Color(cfg.color);
+
+      var shapes = [];
+
+      if (mode === 'cells') {
+        // Extrude each individual polygon as a solid cell
+        for (var i = 0; i < polygons.length; i++) {
+          var poly = polygons[i];
+          if (poly.length < 3) continue;
+
+          var s = new THREE.Shape();
+          s.moveTo(poly[0].x, poly[0].y);
+          for (var j = 1; j < poly.length; j++) s.lineTo(poly[j].x, poly[j].y);
+          s.closePath();
+
+          shapes.push(new THREE.ExtrudeGeometry(s, { depth: depth, bevelEnabled: false }));
+        }
       } else {
-        // walls or through-cut: extrude a plate with holes
-        var outerShape=new THREE.Shape();
-        outerShape.moveTo(0,0); outerShape.lineTo(w,0); outerShape.lineTo(w,h); outerShape.lineTo(0,h); outerShape.closePath();
+        // 'walls' or 'through' mode: solid outer frame with cell cutouts
+        var outerShape = new THREE.Shape();
+        outerShape.moveTo(0, 0);
+        outerShape.lineTo(w, 0);
+        outerShape.lineTo(w, h);
+        outerShape.lineTo(0, h);
+        outerShape.closePath();
 
-        for(var i=0;i<polys.length;i++){
-          var poly=polys[i];
-          if(poly.length<3) continue;
-          var hole=new THREE.Path();
-          hole.moveTo(poly[0].x,poly[0].y);
-          for(var j=1;j<poly.length;j++) hole.lineTo(poly[j].x,poly[j].y);
+        for (var i = 0; i < polygons.length; i++) {
+          var poly = polygons[i];
+          if (poly.length < 3) continue;
+
+          var hole = new THREE.Path();
+          hole.moveTo(poly[0].x, poly[0].y);
+          for (var j = 1; j < poly.length; j++) hole.lineTo(poly[j].x, poly[j].y);
           hole.closePath();
           outerShape.holes.push(hole);
         }
 
-        geom=new THREE.ExtrudeGeometry(outerShape,{depth:depth,bevelEnabled:false});
+        shapes.push(new THREE.ExtrudeGeometry(outerShape, { depth: depth, bevelEnabled: false }));
       }
 
-      geom.computeBoundingBox();
-      var box=geom.boundingBox, cx=(box.max.x+box.min.x)/2, cy=(box.max.y+box.min.y)/2, cz=(box.max.z+box.min.z)/2;
-      geom.translate(-cx,-cy,-cz);
+      if (shapes.length === 0) return;
 
-      var mat=new THREE.MeshStandardMaterial({color:color,roughness:0.35,metalness:0.05,side:THREE.DoubleSide});
-      currentMesh=new THREE.Mesh(geom,mat);
-      currentMesh.castShadow=true;
+      // Merge all extruded geometries
+      var geom;
+      if (shapes.length === 1) {
+        geom = shapes[0];
+      } else {
+        // Simple manual merge for multiple cell extrusions
+        var merged = new THREE.BufferGeometry();
+        var pos = [], norm = [];
+
+        for (var i = 0; i < shapes.length; i++) {
+          var p = shapes[i].attributes.position.array;
+          var n = shapes[i].attributes.normal ? shapes[i].attributes.normal.array : null;
+
+          for (var k = 0; k < p.length; k++) pos.push(p[k]);
+          if (n) { for (var k = 0; k < n.length; k++) norm.push(n[k]); }
+        }
+
+        merged.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+        if (norm.length > 0) merged.setAttribute('normal', new THREE.Float32BufferAttribute(norm, 3));
+        geom = merged;
+      }
+
+      // Center geometry origin to center of viewport
+      geom.computeBoundingBox();
+      var box = geom.boundingBox;
+      var cx = (box.max.x + box.min.x) / 2;
+      var cy = (box.max.y + box.min.y) / 2;
+      var cz = (box.max.z + box.min.z) / 2;
+      geom.translate(-cx, -cy, -cz);
+
+      var mat = new THREE.MeshStandardMaterial({
+        color: color,
+        roughness: 0.3,
+        metalness: 0.1,
+        side: THREE.DoubleSide
+      });
+
+      currentMesh = new THREE.Mesh(geom, mat);
+      currentMesh.castShadow = true;
+      currentMesh.receiveShadow = true;
       scene.add(currentMesh);
     }
 
-    // ── FULL REBUILD ─────────────────────────────────────────
-    function setStatus(msg, cls){
-      var el=document.getElementById('status');
-      el.textContent=msg;
-      el.className='status-bar'+(cls?' '+cls:'');
+    // ─────────────────────────────────────────────────────────
+    // APP REBUILD CONTROLLER
+    // ─────────────────────────────────────────────────────────
+
+    function setStatus(msg, cls) {
+      var el = document.getElementById('status');
+      el.textContent = msg;
+      el.className = 'status-bar' + (cls ? ' ' + cls : '');
     }
 
-    function rebuild(){
-      setStatus('Generating…');
-      setTimeout(function(){
+    function rebuild() {
+      setStatus('Generating pattern…');
+      setTimeout(function() {
         try {
-          var seeds=generateSeeds();
-          var rawPolys=computeCells(seeds);
-          var sp=cfg.spacing;
-          var polys=[];
-          for(var i=0;i<rawPolys.length;i++){
-            var p=retract(rawPolys[i],sp);
-            if(p.length>=3){
-              if(cfg.curve==='bezier') p=smoothPoly(p);
-              polys.push(p);
+          var seeds = generateSeeds();
+          var rawPolys = computeVoronoiCells(seeds);
+
+          var wallOffset = cfg.spacing / 2.0; // Half thickness on each cell edge
+          var polys = [];
+
+          for (var i = 0; i < rawPolys.length; i++) {
+            var retracted = retractPolygon(rawPolys[i], wallOffset);
+            if (retracted.length >= 3) {
+              if (cfg.curve === 'bezier') retracted = smoothPolygon(retracted);
+              polys.push(retracted);
             }
           }
-          cellPolygons=polys;
-          build3D(polys);
-          setStatus('✓ '+(seeds.length)+' seeds, '+(polys.length)+' cells', 'ok');
-        } catch(e){
-          setStatus('Error: '+e.message,'err');
+
+          cellPolygons = polys;
+          build3DGeometry(polys);
+
+          setStatus('✓ Generated ' + polys.length + ' cells', 'ok');
+        } catch (e) {
+          setStatus('Error: ' + e.message, 'err');
           console.error(e);
         }
       }, 20);
     }
 
-    // ── STL EXPORT ───────────────────────────────────────────
-    function exportSTL(){
-      if(!currentMesh){setStatus('Nothing to export','err');return;}
-      setStatus('Exporting STL…');
-      setTimeout(function(){
-        try{
-          var geom=currentMesh.geometry;
-          var pos=geom.attributes.position;
-          var buf=new ArrayBuffer(84+50*pos.count/3*4);
-          var view=new DataView(buf);
-          var offset=0;
-          // Write 80-byte header
-          for(var i=0;i<80;i++) view.setUint8(offset++,0);
-          var triCount=pos.count/3;
-          view.setUint32(offset,triCount,true); offset+=4;
-          for(var i=0;i<triCount;i++){
-            var i3=i*3;
-            var ax=pos.getX(i3),ay=pos.getY(i3),az=pos.getZ(i3);
-            var bx=pos.getX(i3+1),by=pos.getY(i3+1),bz=pos.getZ(i3+1);
-            var cx=pos.getX(i3+2),cy=pos.getY(i3+2),cz=pos.getZ(i3+2);
+    // ─────────────────────────────────────────────────────────
+    // STL & SVG EXPORTERS
+    // ─────────────────────────────────────────────────────────
+
+    function exportSTL() {
+      if (!currentMesh) { setStatus('Nothing to export', 'err'); return; }
+      setStatus('Exporting binary STL…');
+      setTimeout(function() {
+        try {
+          var geom = currentMesh.geometry;
+          var pos = geom.attributes.position;
+          var triCount = pos.count / 3;
+
+          var buf = new ArrayBuffer(84 + triCount * 50);
+          var view = new DataView(buf);
+          var offset = 0;
+
+          // Header
+          for (var i = 0; i < 80; i++) view.setUint8(offset++, 0);
+          view.setUint32(offset, triCount, true); offset += 4;
+
+          for (var i = 0; i < triCount; i++) {
+            var i3 = i * 3;
+            var ax = pos.getX(i3), ay = pos.getY(i3), az = pos.getZ(i3);
+            var bx = pos.getX(i3 + 1), by = pos.getY(i3 + 1), bz = pos.getZ(i3 + 1);
+            var cx = pos.getX(i3 + 2), cy = pos.getY(i3 + 2), cz = pos.getZ(i3 + 2);
+
             // Normal
-            view.setFloat32(offset,0,true);offset+=4;
-            view.setFloat32(offset,0,true);offset+=4;
-            view.setFloat32(offset,1,true);offset+=4;
-            // Verts
-            view.setFloat32(offset,ax,true);offset+=4;view.setFloat32(offset,ay,true);offset+=4;view.setFloat32(offset,az,true);offset+=4;
-            view.setFloat32(offset,bx,true);offset+=4;view.setFloat32(offset,by,true);offset+=4;view.setFloat32(offset,bz,true);offset+=4;
-            view.setFloat32(offset,cx,true);offset+=4;view.setFloat32(offset,cy,true);offset+=4;view.setFloat32(offset,cz,true);offset+=4;
-            view.setUint16(offset,0,true);offset+=2;
+            view.setFloat32(offset, 0, true); offset += 4;
+            view.setFloat32(offset, 0, true); offset += 4;
+            view.setFloat32(offset, 1, true); offset += 4;
+
+            // Vertices
+            view.setFloat32(offset, ax, true); offset += 4;
+            view.setFloat32(offset, ay, true); offset += 4;
+            view.setFloat32(offset, az, true); offset += 4;
+
+            view.setFloat32(offset, bx, true); offset += 4;
+            view.setFloat32(offset, by, true); offset += 4;
+            view.setFloat32(offset, bz, true); offset += 4;
+
+            view.setFloat32(offset, cx, true); offset += 4;
+            view.setFloat32(offset, cy, true); offset += 4;
+            view.setFloat32(offset, cz, true); offset += 4;
+
+            view.setUint16(offset, 0, true); offset += 2;
           }
-          var blob=new Blob([buf],{type:'application/octet-stream'});
-          var a=document.createElement('a');
-          a.href=URL.createObjectURL(blob);
-          a.download='voronoi_'+cfg.mode+'.stl';
+
+          var blob = new Blob([buf], { type: 'application/octet-stream' });
+          var a = document.createElement('a');
+          a.href = URL.createObjectURL(blob);
+          a.download = 'voronoi_honeycomb_' + cfg.mode + '.stl';
           a.click();
           URL.revokeObjectURL(a.href);
-          setStatus('STL exported!','ok');
-        }catch(e){setStatus('Export error: '+e.message,'err');}
-      },10);
+          setStatus('STL exported successfully!', 'ok');
+        } catch (e) {
+          setStatus('Export error: ' + e.message, 'err');
+        }
+      }, 10);
     }
 
-    // ── SVG EXPORT ───────────────────────────────────────────
-    function exportSVG(){
-      if(!cellPolygons.length){setStatus('No cells to export','err');return;}
-      var paths='';
-      for(var i=0;i<cellPolygons.length;i++){
-        var p=cellPolygons[i];
-        if(p.length<3)continue;
-        var d='M '+p[0].x.toFixed(2)+' '+p[0].y.toFixed(2);
-        for(var j=1;j<p.length;j++) d+=' L '+p[j].x.toFixed(2)+' '+p[j].y.toFixed(2);
-        d+=' Z';
-        paths+='<path d="'+d+'" fill="#4285F4" fill-opacity="0.18" stroke="#1A73E8" stroke-width="1"/>\n';
+    function exportSVG() {
+      if (!cellPolygons.length) { setStatus('No cells to export', 'err'); return; }
+      var paths = '';
+      for (var i = 0; i < cellPolygons.length; i++) {
+        var p = cellPolygons[i];
+        if (p.length < 3) continue;
+        var d = 'M ' + p[0].x.toFixed(2) + ' ' + p[0].y.toFixed(2);
+        for (var j = 1; j < p.length; j++) d += ' L ' + p[j].x.toFixed(2) + ' ' + p[j].y.toFixed(2);
+        d += ' Z';
+        paths += '  <path d="' + d + '" fill="#4285F4" fill-opacity="0.2" stroke="#1A73E8" stroke-width="1.5"/>\n';
       }
-      var svg='<?xml version="1.0" encoding="UTF-8"?>\n<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 '+cfg.w+' '+cfg.h+'" width="'+cfg.w+'mm" height="'+cfg.h+'mm">\n<rect width="'+cfg.w+'" height="'+cfg.h+'" fill="none" stroke="#333" stroke-width="1.5"/>\n'+paths+'</svg>';
-      var blob=new Blob([svg],{type:'image/svg+xml'});
-      var a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='voronoi.svg'; a.click(); URL.revokeObjectURL(a.href);
-      setStatus('SVG exported!','ok');
+
+      var svg = '<?xml version="1.0" encoding="UTF-8"?>\n<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ' + cfg.w + ' ' + cfg.h + '" width="' + cfg.w + 'mm" height="' + cfg.h + 'mm">\n  <rect width="' + cfg.w + '" height="' + cfg.h + '" fill="none" stroke="#333" stroke-width="2"/>\n' + paths + '</svg>';
+      var blob = new Blob([svg], { type: 'image/svg+xml;charset=utf-8' });
+      var a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'voronoi_honeycomb.svg';
+      a.click();
+      URL.revokeObjectURL(a.href);
+      setStatus('SVG exported successfully!', 'ok');
     }
 
-    // ── UI BINDINGS ──────────────────────────────────────────
-    function bind(sliderId, valId, cfgKey, fmt, doRebuild){
-      var sl=document.getElementById(sliderId), vl=document.getElementById(valId);
-      if(!sl)return;
-      sl.addEventListener('input',function(){
-        var v=parseFloat(sl.value);
-        cfg[cfgKey]=v;
-        vl.textContent=fmt(v);
-        if(doRebuild) rebuild();
+    // ─────────────────────────────────────────────────────────
+    // UI EVENT BINDINGS
+    // ─────────────────────────────────────────────────────────
+
+    function bind(sliderId, valId, cfgKey, fmt) {
+      var sl = document.getElementById(sliderId), vl = document.getElementById(valId);
+      if (!sl) return;
+      sl.addEventListener('input', function() {
+        var v = parseFloat(sl.value);
+        cfg[cfgKey] = v;
+        if (vl) vl.textContent = fmt(v);
+        rebuild();
       });
     }
 
-    bind('s-seeds','v-seeds','seeds',function(v){return Math.round(v);},true);
-    bind('s-blend','v-blend','blend',function(v){return Math.round(v*100)+'%';},true);
-    bind('s-spacing','v-spacing','spacing',function(v){return v.toFixed(1)+' mm';},true);
-    bind('s-depth','v-depth','depth',function(v){return Math.round(v)+' mm';},true);
-    bind('s-w','v-w','w',function(v){return Math.round(v)+' mm';},true);
-    bind('s-h','v-h','h',function(v){return Math.round(v)+' mm';},true);
+    bind('s-seeds', 'v-seeds', 'hexSize', function(v) { return 'Hex ~' + Math.round(v) + 'mm'; });
+    bind('s-blend', 'v-blend', 'blend', function(v) { return Math.round(v * 100) + '%'; });
+    bind('s-spacing', 'v-spacing', 'spacing', function(v) { return v.toFixed(1) + ' mm'; });
+    bind('s-depth', 'v-depth', 'depth', function(v) { return Math.round(v) + ' mm'; });
+    bind('s-w', 'v-w', 'w', function(v) { return Math.round(v) + ' mm'; });
+    bind('s-h', 'v-h', 'h', function(v) { return Math.round(v) + ' mm'; });
 
-    function makeSeg(groupId, cfgKey, doRebuild){
-      var btns=document.querySelectorAll('#'+groupId+' .seg-btn');
-      btns.forEach(function(btn){
-        btn.addEventListener('click',function(){
-          btns.forEach(function(b){b.classList.remove('active');});
+    function makeSeg(groupId, cfgKey) {
+      var btns = document.querySelectorAll('#' + groupId + ' .seg-btn');
+      btns.forEach(function(btn) {
+        btn.addEventListener('click', function() {
+          btns.forEach(function(b) { b.classList.remove('active'); });
           btn.classList.add('active');
-          cfg[cfgKey]=btn.getAttribute('data-v');
-          if(doRebuild) rebuild();
+          cfg[cfgKey] = btn.getAttribute('data-v');
+          rebuild();
         });
       });
     }
-    makeSeg('seg-mode','mode',true);
-    makeSeg('seg-curve','curve',true);
+    makeSeg('seg-mode', 'mode');
+    makeSeg('seg-curve', 'curve');
 
-    document.getElementById('inp-color').addEventListener('input',function(){
-      cfg.color=this.value;
-      if(currentMesh&&currentMesh.material) currentMesh.material.color.set(cfg.color);
+    document.getElementById('inp-color').addEventListener('input', function() {
+      cfg.color = this.value;
+      if (currentMesh && currentMesh.material) currentMesh.material.color.set(cfg.color);
     });
 
-    document.getElementById('btn-rand').addEventListener('click',rebuild);
-    document.getElementById('btn-reset').addEventListener('click',function(){ resetCamera(); });
-    document.getElementById('btn-stl').addEventListener('click',exportSTL);
-    document.getElementById('btn-svg').addEventListener('click',exportSVG);
+    document.getElementById('btn-rand').addEventListener('click', rebuild);
+    document.getElementById('btn-reset').addEventListener('click', resetCamera);
+    document.getElementById('btn-stl').addEventListener('click', exportSTL);
+    document.getElementById('btn-svg').addEventListener('click', exportSVG);
 
-    // INIT
-    document.getElementById('loading').style.display='none';
+    // INITIAL BUILD
+    document.getElementById('loading').style.display = 'none';
     rebuild();
 
   })();
   </script>
-
 </body>
 </html>
