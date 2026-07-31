@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>3D Voronoi & Honeycomb Generator</title>
+  
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  
+  <!-- Stylesheet -->
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <div id="app-container">
+    
+    <!-- HEADER -->
+    <header class="header">
+      <div class="header-brand">
+        <div class="header-logo">V3D</div>
+        <div>
+          <h1 class="header-title">Voronoi & Honeycomb 3D</h1>
+          <p class="header-subtitle">Parametric 3D Pattern Generator & STL Exporter</p>
+        </div>
+      </div>
+      <div class="header-actions">
+        <a href="https://github.com/Pannawat2008/Pannawat2008.github.io" target="_blank" class="github-link">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/>
+          </svg>
+          GitHub
+        </a>
+      </div>
+    </header>
+
+    <!-- MAIN CONTENT -->
+    <div class="main-content">
+      
+      <!-- SIDEBAR CONTROLS -->
+      <aside class="sidebar">
+        
+        <!-- CARD 1: PATTERN DENSITY & BLEND -->
+        <div class="card">
+          <div class="card-title">Pattern & Blending</div>
+
+          <div class="control-group">
+            <div class="control-label-row">
+              <span>Seed Count</span>
+              <span class="control-value" id="val-seeds">40</span>
+            </div>
+            <input type="range" id="slider-seeds" min="10" max="150" value="40" step="1" />
+          </div>
+
+          <div class="control-group">
+            <div class="control-label-row">
+              <span>Honeycomb Blend</span>
+              <span class="control-value" id="val-blend">50%</span>
+            </div>
+            <input type="range" id="slider-blend" min="0" max="1" value="0.5" step="0.05" />
+          </div>
+
+          <div class="control-group">
+            <button class="btn btn-outline" id="btn-randomize">
+              🎲 Randomize Voronoi Seeds
+            </button>
+          </div>
+        </div>
+
+        <!-- CARD 2: GEOMETRY & EXTRUSION -->
+        <div class="card">
+          <div class="card-title">3D Geometry & Spacing</div>
+
+          <div class="control-group">
+            <div class="control-label-row">
+              <span>Cell Spacing (Walls)</span>
+              <span class="control-value" id="val-spacing">2.5 mm</span>
+            </div>
+            <input type="range" id="slider-spacing" min="0.5" max="10" value="2.5" step="0.5" />
+          </div>
+
+          <div class="control-group">
+            <div class="control-label-row">
+              <span>Extrusion Height</span>
+              <span class="control-value" id="val-depth">12.0 mm</span>
+            </div>
+            <input type="range" id="slider-depth" min="2" max="50" value="12" step="1" />
+          </div>
+
+          <div class="control-group">
+            <div class="control-label-row">
+              <span>Panel Width</span>
+              <span class="control-value" id="val-width">200 mm</span>
+            </div>
+            <input type="range" id="slider-width" min="80" max="400" value="200" step="10" />
+          </div>
+
+          <div class="control-group">
+            <div class="control-label-row">
+              <span>Panel Height</span>
+              <span class="control-value" id="val-height">120 mm</span>
+            </div>
+            <input type="range" id="slider-height" min="60" max="300" value="120" step="10" />
+          </div>
+        </div>
+
+        <!-- CARD 3: STYLES & MODES -->
+        <div class="card">
+          <div class="card-title">Extrusion Mode & Style</div>
+
+          <div class="control-group">
+            <div class="control-label-row" style="margin-bottom:6px;">Extrusion Mode</div>
+            <div class="segmented-control">
+              <button class="segmented-btn active" data-mode="walls">Walls</button>
+              <button class="segmented-btn" data-mode="cells">Cells</button>
+              <button class="segmented-btn" data-mode="through-cut">Through</button>
+            </div>
+          </div>
+
+          <div class="control-group">
+            <div class="control-label-row" style="margin-bottom:6px;">Edge Smoothing</div>
+            <div class="segmented-control">
+              <button class="segmented-btn active" data-curve="cubic">Cubic</button>
+              <button class="segmented-btn" data-curve="quadratic">Quad</button>
+              <button class="segmented-btn" data-curve="straight">Linear</button>
+            </div>
+          </div>
+
+          <div class="control-group color-picker-row">
+            <span style="font-size:13px; font-weight:500; color:var(--text-secondary);">Preview Color</span>
+            <input type="color" id="input-color" value="#4285F4" />
+          </div>
+        </div>
+
+        <!-- CARD 4: EXPORT OPTIONS -->
+        <div class="card">
+          <div class="card-title">Export Options</div>
+          <div style="display:flex; flex-direction:column; gap:10px;">
+            <button class="btn btn-primary" id="btn-export-stl">
+              📥 Export 3D STL (for 3D Printing)
+            </button>
+            <button class="btn btn-secondary" id="btn-export-svg">
+              📄 Export 2D SVG (for Laser Cutting)
+            </button>
+          </div>
+        </div>
+
+      </aside>
+
+      <!-- 3D VIEWPORT -->
+      <main class="viewport-container">
+        <div id="viewport-3d"></div>
+        <div class="viewport-overlay">
+          <button class="overlay-btn" id="btn-reset-view">🎯 Reset Camera</button>
+        </div>
+      </main>
+
+    </div>
+  </div>
+
+  <!-- Main JavaScript App Loader -->
+  <script type="module">
+    import { VoronoiGenApp } from './js/app.js';
+    import { setupUI } from './js/ui.js';
+
+    document.addEventListener('DOMContentLoaded', () => {
+      const app = new VoronoiGenApp();
+      const viewportContainer = document.getElementById('viewport-3d');
+      app.init(viewportContainer);
+      setupUI(app);
+    });
+  </script>
+</body>
+</html>
