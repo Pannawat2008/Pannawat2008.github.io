@@ -605,7 +605,7 @@
       return finalSeeds;
     }
 
-    // ─── VORONOI CELLS ───────────────────────────────────────
+    // ─── VORONOI CELLS WITH POLAR VERTEX SORTING ─────────────
     function computeVoronoiCells(seeds) {
       var bbox = { xl: 0, xr: cfg.w, yt: 0, yb: cfg.h };
       var voronoi = new Voronoi();
@@ -621,7 +621,17 @@
           verts.push({x:p.x, y:p.y});
         }
         if (!ok || verts.length < 3) continue;
-        cells.push(verts);
+
+        // CRITICAL FIX: Sort vertices by polar angle around cell centroid!
+        var cx = 0, cy = 0;
+        for (var k = 0; k < verts.length; k++) { cx += verts[k].x; cy += verts[k].y; }
+        cx /= verts.length; cy /= verts.length;
+
+        verts.sort(function(a, b) {
+          return Math.atan2(a.y - cy, a.x - cx) - Math.atan2(b.y - cy, b.x - cx);
+        });
+
+        cells.push(cleanPoly(verts));
       }
       return cells;
     }
@@ -632,7 +642,6 @@
       var c = getCentroid(verts);
       var n = verts.length;
 
-      // Calculate inradius (min dist from centroid to any edge)
       var minInradius = Infinity;
       for (var i = 0; i < n; i++) {
         var v1 = verts[i], v2 = verts[(i + 1) % n];
