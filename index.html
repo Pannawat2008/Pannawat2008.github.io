@@ -219,8 +219,8 @@
       <div class="card">
         <div class="card-label">Pattern &amp; Blending</div>
         <div class="ctrl">
-          <div class="lrow"><span>Seed Count</span><span class="lval" id="v-seeds">35</span></div>
-          <input type="range" id="s-seeds" min="10" max="90" value="35" step="1">
+          <div class="lrow"><span>Seed Count</span><span class="lval" id="v-seeds">30</span></div>
+          <input type="range" id="s-seeds" min="10" max="80" value="30" step="1">
         </div>
         <div class="ctrl">
           <div class="lrow"><span>Honeycomb Blend</span><span class="lval" id="v-blend">50%</span></div>
@@ -234,8 +234,8 @@
       <div class="card">
         <div class="card-label">3D Geometry</div>
         <div class="ctrl">
-          <div class="lrow"><span>Wall Thickness (Spacing)</span><span class="lval" id="v-spacing">3.5 mm</span></div>
-          <input type="range" id="s-spacing" min="1.0" max="10" value="3.5" step="0.5">
+          <div class="lrow"><span>Wall Thickness (Spacing)</span><span class="lval" id="v-spacing">4.0 mm</span></div>
+          <input type="range" id="s-spacing" min="1.0" max="10" value="4.0" step="0.5">
         </div>
         <div class="ctrl">
           <div class="lrow"><span>Extrusion Height</span><span class="lval" id="v-depth">12 mm</span></div>
@@ -308,8 +308,8 @@
     // CONFIG
     var cfg = {
       w: 200, h: 120,
-      seeds: 35,
-      spacing: 3.5,
+      seeds: 30,
+      spacing: 4.0,
       depth: 12,
       blend: 0.5,
       mode: 'walls',
@@ -397,8 +397,19 @@
       return area / 2.0;
     }
 
+    function cleanPolygon(pts) {
+      var out = [];
+      for (var i = 0; i < pts.length; i++) {
+        var next = pts[(i + 1) % pts.length];
+        if (dist(pts[i], next) > 0.3) {
+          out.push(pts[i]);
+        }
+      }
+      return out;
+    }
+
     function ensureClockwise(pts) {
-      if (polygonArea(pts) > 0) return pts.slice().reverse(); // Make CW for Three.js hole cutouts
+      if (polygonArea(pts) > 0) return pts.slice().reverse(); // Make CW for Three.js holes
       return pts;
     }
 
@@ -421,8 +432,8 @@
 
         for (var s = 0; s < numSamples; s++) {
           var cand = {
-            x: 12 + Math.random() * (w - 24),
-            y: 12 + Math.random() * (h - 24)
+            x: 15 + Math.random() * (w - 30),
+            y: 15 + Math.random() * (h - 30)
           };
 
           var minD = Math.min(cand.x, cand.y, w - cand.x, h - cand.y);
@@ -550,6 +561,7 @@
       var dx = v2.x - v1.x, dy = v2.y - v1.y;
       var len = Math.sqrt(dx * dx + dy * dy);
       if (len < 1e-7) return { v1: { x: v1.x, y: v1.y }, v2: { x: v2.x, y: v2.y } };
+      // Normal vector pointing inward into CCW polygon
       var nx = -dy / len * d;
       var ny = dx / len * d;
       return { v1: { x: v1.x + nx, y: v1.y + ny }, v2: { x: v2.x + nx, y: v2.y + ny } };
@@ -561,7 +573,7 @@
       var denom = (x1 - x2) * (y3 - y4) - (y1 - y2) * (x3 - x4);
       if (Math.abs(denom) < 1e-8) return null;
       var px = ((x1 * y2 - y1 * x2) * (x3 - x4) - (x1 - x2) * (x3 * y4 - y3 * x4)) / denom;
-      var py = ((x1 * y2 - y1 * x2) * (y3 - y4) - (y1 - y2) * (x3 - x4)) / denom;
+      var py = ((x1 * y2 - y1 * x2) * (y3 - y4) - (y1 - y2) * (x3 * y4 - y3 * x4)) / denom;
       return { x: px, y: py };
     }
 
@@ -583,29 +595,27 @@
           y: Math.max(borderMargin, Math.min(cfg.h - borderMargin, pt.y))
         });
       }
-      return out;
+      return cleanPolygon(out);
     }
 
     // ─────────────────────────────────────────────────────────
-    // CORNER FILLETS (ROUNDED CORNERS)
+    // CORNER FILLETS (SMOOTH ROUNDED CORNERS)
     // ─────────────────────────────────────────────────────────
 
     function applyCornerFillets(verts) {
       if (verts.length < 3) return verts;
       var n = verts.length;
       var out = [];
-      var radiusRatio = 0.25; // fillet radius factor along edge
+      var factor = 0.25; // Fillet ratio along edge
 
       for (var i = 0; i < n; i++) {
         var prev = verts[(i + n - 1) % n];
         var curr = verts[i];
         var next = verts[(i + 1) % n];
 
-        // Points along incoming and outgoing edge segments
-        var p1 = { x: curr.x + (prev.x - curr.x) * radiusRatio, y: curr.y + (prev.y - curr.y) * radiusRatio };
-        var p2 = { x: curr.x + (next.x - curr.x) * radiusRatio, y: curr.y + (next.y - curr.y) * radiusRatio };
+        var p1 = { x: curr.x + (prev.x - curr.x) * factor, y: curr.y + (prev.y - curr.y) * factor };
+        var p2 = { x: curr.x + (next.x - curr.x) * factor, y: curr.y + (next.y - curr.y) * factor };
 
-        // Quadratic arc around corner
         for (var step = 0; step <= 3; step++) {
           var t = step / 3;
           var u = 1 - t;
@@ -616,7 +626,7 @@
         }
       }
 
-      return out;
+      return cleanPolygon(out);
     }
 
     // ─────────────────────────────────────────────────────────
@@ -667,7 +677,7 @@
         outerShape.closePath();
 
         for (var i = 0; i < polys.length; i++) {
-          var poly = ensureClockwise(polys[i]); // Holes MUST be Clockwise for Three.js
+          var poly = ensureClockwise(polys[i]); // Holes MUST be Clockwise for Three.js Earcut
           if (poly.length < 3) continue;
 
           var hole = new THREE.Path();
@@ -748,7 +758,7 @@
             var retracted = retractPolygon(ccwCell, halfGap);
 
             // Skip collapsed micro-cells
-            if (retracted.length >= 3 && Math.abs(polygonArea(retracted)) >= 12) {
+            if (retracted.length >= 3 && Math.abs(polygonArea(retracted)) >= 15) {
               if (cfg.curve === 'fillet') retracted = applyCornerFillets(retracted);
               polys.push(retracted);
             }
@@ -757,7 +767,7 @@
           cellPolygons = polys;
           build3D(polys);
 
-          setStatus('✓ Generated ' + polys.length + ' clean 3D cells', 'ok');
+          setStatus('✓ Generated ' + polys.length + ' watertight 3D cells', 'ok');
         } catch (e) {
           setStatus('Error: ' + e.message, 'err');
           console.error(e);
