@@ -427,16 +427,18 @@
       var seeds = [];
       var dx = r * Math.sqrt(3);
       var dy = r * 1.5;
-      var cols = Math.ceil(w / dx) + 4;
-      var rows = Math.ceil(h / dy) + 4;
+      var cols = Math.ceil(w / dx) + 1;
+      var rows = Math.ceil(h / dy) + 1;
 
-      for (var row = -2; row < rows; row++) {
+      for (var row = 0; row < rows; row++) {
         var xOff = (row % 2 !== 0) ? dx / 2 : 0;
-        var y = row * dy - dy;
+        var y = row * dy;
 
-        for (var col = -2; col < cols; col++) {
-          var x = col * dx + xOff - dx;
-          seeds.push({ x: x, y: y });
+        for (var col = 0; col < cols; col++) {
+          var x = col * dx + xOff;
+          if (x >= 0 && x <= w && y >= 0 && y <= h) {
+            seeds.push({ x: x, y: y });
+          }
         }
       }
       return seeds;
@@ -498,8 +500,7 @@
     // ─────────────────────────────────────────────────────────
 
     function computeVoronoiCells(seeds) {
-      var margin = 40;
-      var bbox = { xl: -margin, xr: cfg.w + margin, yt: -margin, yb: cfg.h + margin };
+      var bbox = { xl: 0, xr: cfg.w, yt: 0, yb: cfg.h };
       var voronoi = new Voronoi();
       var diagram = voronoi.compute(seeds, bbox);
 
@@ -521,12 +522,7 @@
 
         if (!ok || verts.length < 3) continue;
 
-        // Keep cells inside/near view bounding box
-        var s = c.site;
-        if (s.x >= -margin * 0.5 && s.x <= cfg.w + margin * 0.5 &&
-            s.y >= -margin * 0.5 && s.y <= cfg.h + margin * 0.5) {
-          cells.push(verts);
-        }
+        cells.push(verts);
       }
 
       return cells;
