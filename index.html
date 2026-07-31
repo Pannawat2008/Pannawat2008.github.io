@@ -401,20 +401,22 @@
       var out = [];
       for (var i = 0; i < pts.length; i++) {
         var next = pts[(i + 1) % pts.length];
-        if (dist(pts[i], next) > 0.3) {
+        if (dist(pts[i], next) > 0.4) {
           out.push(pts[i]);
         }
       }
       return out;
     }
 
+    // In 2D plane: area < 0 is Clockwise (CW) for Three.js holes
     function ensureClockwise(pts) {
-      if (polygonArea(pts) > 0) return pts.slice().reverse(); // Make CW for Three.js holes
+      if (polygonArea(pts) > 0) return pts.slice().reverse();
       return pts;
     }
 
+    // In 2D plane: area > 0 is Counter-Clockwise (CCW) for Three.js outer shape
     function ensureCounterClockwise(pts) {
-      if (polygonArea(pts) < 0) return pts.slice().reverse(); // Make CCW for outer shape
+      if (polygonArea(pts) < 0) return pts.slice().reverse();
       return pts;
     }
 
@@ -432,8 +434,8 @@
 
         for (var s = 0; s < numSamples; s++) {
           var cand = {
-            x: 15 + Math.random() * (w - 30),
-            y: 15 + Math.random() * (h - 30)
+            x: 18 + Math.random() * (w - 36),
+            y: 18 + Math.random() * (h - 36)
           };
 
           var minD = Math.min(cand.x, cand.y, w - cand.x, h - cand.y);
@@ -587,7 +589,7 @@
       }
 
       var out = [];
-      var borderMargin = Math.max(1.5, d);
+      var borderMargin = Math.max(2.0, d);
       for (var i = 0; i < n; i++) {
         var pt = lineIntersect(segs[(i + n - 1) % n], segs[i]) || segs[i].v1;
         out.push({
@@ -606,7 +608,7 @@
       if (verts.length < 3) return verts;
       var n = verts.length;
       var out = [];
-      var factor = 0.25; // Fillet ratio along edge
+      var factor = 0.25;
 
       for (var i = 0; i < n; i++) {
         var prev = verts[(i + n - 1) % n];
@@ -677,7 +679,8 @@
         outerShape.closePath();
 
         for (var i = 0; i < polys.length; i++) {
-          var poly = ensureClockwise(polys[i]); // Holes MUST be Clockwise for Three.js Earcut
+          var poly = cleanPolygon(polys[i]);
+          poly = ensureClockwise(poly); // Holes MUST be Clockwise for Three.js Earcut
           if (poly.length < 3) continue;
 
           var hole = new THREE.Path();
@@ -753,12 +756,12 @@
           var polys = [];
 
           for (var i = 0; i < rawCells.length; i++) {
-            // Force CCW winding order so offsetSeg retracts edges INWARD
+            // Force CCW winding order so offsetSeg retracts edges INWARD into polygon
             var ccwCell = ensureCounterClockwise(rawCells[i]);
             var retracted = retractPolygon(ccwCell, halfGap);
 
             // Skip collapsed micro-cells
-            if (retracted.length >= 3 && Math.abs(polygonArea(retracted)) >= 15) {
+            if (retracted.length >= 3 && Math.abs(polygonArea(retracted)) >= 20) {
               if (cfg.curve === 'fillet') retracted = applyCornerFillets(retracted);
               polys.push(retracted);
             }
@@ -767,7 +770,7 @@
           cellPolygons = polys;
           build3D(polys);
 
-          setStatus('✓ Generated ' + polys.length + ' watertight 3D cells', 'ok');
+          setStatus('✓ Generated ' + polys.length + ' clean 3D cells', 'ok');
         } catch (e) {
           setStatus('Error: ' + e.message, 'err');
           console.error(e);
