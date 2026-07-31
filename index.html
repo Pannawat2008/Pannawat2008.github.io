@@ -743,8 +743,11 @@
           var polys = [];
 
           for (var i = 0; i < rawCells.length; i++) {
-            var retracted = retractPolygon(rawCells[i], halfGap);
-            // Skip collapsed small micro-cells
+            // Force CCW winding order so offsetSeg retracts edges INWARD
+            var ccwCell = ensureCounterClockwise(rawCells[i]);
+            var retracted = retractPolygon(ccwCell, halfGap);
+
+            // Skip collapsed micro-cells
             if (retracted.length >= 3 && Math.abs(polygonArea(retracted)) >= 12) {
               if (cfg.curve === 'fillet') retracted = applyCornerFillets(retracted);
               polys.push(retracted);
@@ -754,7 +757,7 @@
           cellPolygons = polys;
           build3D(polys);
 
-          setStatus('✓ Generated ' + polys.length + ' clean cells', 'ok');
+          setStatus('✓ Generated ' + polys.length + ' clean 3D cells', 'ok');
         } catch (e) {
           setStatus('Error: ' + e.message, 'err');
           console.error(e);
