@@ -725,10 +725,8 @@
     }
 
     // ─── VORONOI CELLS ───────────────────────────────────────
-    function computeVoronoiCells(seeds, isUncropped) {
-      var bbox = isUncropped
-        ? { xl: -60, xr: cfg.w + 60, yt: -60, yb: cfg.h + 60 }
-        : { xl: 0, xr: cfg.w, yt: 0, yb: cfg.h };
+    function computeVoronoiCells(seeds) {
+      var bbox = { xl: 0, xr: cfg.w, yt: 0, yb: cfg.h };
 
       var voronoi = new Voronoi();
       var diagram = voronoi.compute(seeds, bbox);
@@ -991,7 +989,7 @@
       setTimeout(function() {
         try {
           var isHexCluster = (cfg.shape === 'hexcluster');
-          var rawCells = computeVoronoiCells(currentSeeds, isHexCluster);
+          var rawCells = computeVoronoiCells(currentSeeds);
           var half = cfg.spacing / 2;
           var polys = [];
           var validRawCells = [];
