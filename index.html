@@ -997,15 +997,11 @@
           for (var i = 0; i < rawCells.length; i++) {
             var cell = ensureCCW(rawCells[i]);
 
-            // 1. Initial clamp to boundary
-            var clipped;
-            if (cfg.shape === 'blob') {
-              clipped = clampPolyToBlob(cell, 0);
-            } else if (isHexCluster) {
-              clipped = cell;
-            } else {
-              clipped = clampPolyToRect(cell, 0);
-            }
+            // Clamp cell to panel bounding box
+            var clipped = (cfg.shape === 'blob')
+              ? clampPolyToBlob(cell, 0)
+              : clampPolyToRect(cell, 0);
+
             if (!clipped || clipped.length < 3) continue;
 
             var cCenter = getCentroid(clipped);
@@ -1014,7 +1010,7 @@
             if (cfg.shape === 'blob') {
               if (!pointInBlobMargin(cCenter, cfg.spacing * 0.8)) continue;
             } else if (isHexCluster) {
-              if (cCenter.x < 10 || cCenter.x > cfg.w - 10 || cCenter.y < 10 || cCenter.y > cfg.h - 10) continue;
+              if (cCenter.x < 12 || cCenter.x > cfg.w - 12 || cCenter.y < 12 || cCenter.y > cfg.h - 12) continue;
             } else {
               if (cCenter.x < cfg.spacing * 0.8 || cCenter.x > cfg.w - cfg.spacing * 0.8 ||
                   cCenter.y < cfg.spacing * 0.8 || cCenter.y > cfg.h - cfg.spacing * 0.8) continue;
