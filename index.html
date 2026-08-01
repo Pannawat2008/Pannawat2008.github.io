@@ -419,7 +419,6 @@
 
     var currentSeeds = [];
     var cellPolygons = [];
-    var unretractedCells = [];
     var clusterBoundaryPoly = [];
 
     // ─── THREE.JS ────────────────────────────────────────────
@@ -576,7 +575,6 @@
     }
 
     // ─── CLUSTER OUTER BOUNDARY OUTLINE ─────────────────────
-    // Computes the exact stepped honeycomb perimeter from the un-retracted outer cells
     function computeClusterOutline(polys) {
       if (!polys || polys.length === 0) return [];
       var edgeCounts = {};
@@ -602,14 +600,12 @@
         }
       }
 
-      // Outer boundary edges appear in exactly 1 cell
       var outerEdges = [];
       for (var k in edgeCounts) {
         if (edgeCounts[k] === 1) outerEdges.push(edgeMap[k]);
       }
       if (outerEdges.length === 0) return [];
 
-      // Chain edges into closed loop
       var loop = [];
       var curr = outerEdges[0].p1;
       loop.push(curr);
@@ -630,7 +626,6 @@
       }
 
       var cleaned = cleanPoly(loop);
-      // Sort CCW
       var c = getCentroid(cleaned);
       cleaned.sort(function(a, b) { return Math.atan2(a.y - c.y, a.x - c.x) - Math.atan2(b.y - c.y, b.x - c.x); });
       return ensureCCW(cleaned);
@@ -663,11 +658,16 @@
       var finalSeeds = [];
       var inShape = function(p) {
         if (cfg.shape === 'blob') return pointInBlobMargin(p, cfg.spacing * 0.5);
-        if (cfg.shape === 'hexcluster') return p.x >= 10 && p.x <= w-10 && p.y >= 10 && p.y <= h-10;
+        if (cfg.shape === 'hexcluster') {
+          var d1 = dist(p, { x: w * 0.32, y: h * 0.5 });
+          var d2 = dist(p, { x: w * 0.68, y: h * 0.5 });
+          var rLobe = Math.min(w, h) * 0.46;
+          return (d1 <= rLobe || d2 <= rLobe) && p.x >= 12 && p.x <= w - 12 && p.y >= 12 && p.y <= h - 12;
+        }
         return p.x >= cfg.spacing && p.x <= w - cfg.spacing && p.y >= cfg.spacing && p.y <= h - cfg.spacing;
       };
 
-      // Foci setup: Single Focus (center) vs Dual Focus (left & right twin cores)
+      // Foci setup: Single Focus vs Dual Focus (twin cores)
       var foci = [];
       if (cfg.foci === 'dual') {
         foci.push({ x: w * 0.32, y: h * 0.5 });
@@ -722,8 +722,11 @@
     }
 
     // ─── VORONOI CELLS ───────────────────────────────────────
-    function computeVoronoiCells(seeds) {
-      var bbox = { xl: 0, xr: cfg.w, yt: 0, yb: cfg.h };
+    function computeVoronoiCells(seeds, isUncropped) {
+      var bbox = isUncropped
+        ? { xl: -60, xr: cfg.w + 60, yt: -60, yb: cfg.h + 60 }
+        : { xl: 0, xr: cfg.w, yt: 0, yb: cfg.h };
+
       var voronoi = new Voronoi();
       var diagram = voronoi.compute(seeds, bbox);
       var cells = [];
@@ -738,7 +741,6 @@
         }
         if (!ok || verts.length < 3) continue;
 
-        // Sort vertices by polar angle around cell centroid
         var cx = 0, cy = 0;
         for (var k = 0; k < verts.length; k++) { cx += verts[k].x; cy += verts[k].y; }
         cx /= verts.length; cy /= verts.length;
@@ -985,7 +987,8 @@
       setStatus('Generating…');
       setTimeout(function() {
         try {
-          var rawCells = computeVoronoiCells(currentSeeds);
+          var isHexCluster = (cfg.shape === 'hexcluster');
+          var rawCells = computeVoronoiCells(currentSeeds, isHexCluster);
           var half = cfg.spacing / 2;
           var polys = [];
           var validRawCells = [];
@@ -997,7 +1000,7 @@
             var clipped;
             if (cfg.shape === 'blob') {
               clipped = clampPolyToBlob(cell, 0);
-            } else if (cfg.shape === 'hexcluster') {
+            } else if (isHexCluster) {
               clipped = cell;
             } else {
               clipped = clampPolyToRect(cell, 0);
@@ -1009,7 +1012,7 @@
             // Filter out cells whose centroid is outside margin
             if (cfg.shape === 'blob') {
               if (!pointInBlobMargin(cCenter, cfg.spacing * 0.8)) continue;
-            } else if (cfg.shape === 'hexcluster') {
+            } else if (isHexCluster) {
               if (cCenter.x < 10 || cCenter.x > cfg.w - 10 || cCenter.y < 10 || cCenter.y > cfg.h - 10) continue;
             } else {
               if (cCenter.x < cfg.spacing * 0.8 || cCenter.x > cfg.w - cfg.spacing * 0.8 ||
@@ -1034,8 +1037,7 @@
             polys.push(ret);
           }
 
-          unretractedCells = validRawCells;
-          if (cfg.shape === 'hexcluster') {
+          if (isHexCluster) {
             clusterBoundaryPoly = computeClusterOutline(validRawCells);
           } else {
             clusterBoundaryPoly = [];
