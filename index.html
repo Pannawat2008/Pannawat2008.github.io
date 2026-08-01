@@ -418,6 +418,7 @@
     };
 
     var currentSeeds = [];
+    var ghostSeeds = [];
     var cellPolygons = [];
     var clusterBoundaryPoly = [];
 
@@ -629,14 +630,17 @@
     }
 
     // ─── SEED GENERATION ─────────────────────────────────────
-    function hexSeeds(w, h, r) {
+    function hexSeeds(w, h, r, margin) {
+      margin = margin || 0;
       var seeds = [];
       var dx = r * Math.sqrt(3), dy = r * 1.5;
-      var cols = Math.ceil(w/dx)+6, rows = Math.ceil(h/dy)+6;
+      var minX = -margin, maxX = w + margin;
+      var minY = -margin, maxY = h + margin;
+      var cols = Math.ceil((maxX - minX)/dx)+6, rows = Math.ceil((maxY - minY)/dy)+6;
       for (var row = -3; row < rows; row++) {
         var xOff = (row % 2 !== 0) ? dx/2 : 0;
         for (var col = -3; col < cols; col++) {
-          var x = col*dx + xOff, y = row*dy;
+          var x = minX + col*dx + xOff, y = minY + row*dy;
           seeds.push({x:x, y:y});
         }
       }
@@ -650,13 +654,17 @@
 
       var area = w * h;
       var hexR = Math.sqrt((2 * area) / (3 * Math.sqrt(3) * n));
-      var hexList = hexSeeds(w, h, hexR);
+
+      // Generate full regular hex grid with margin for ghost padding
+      var fullHexList = hexSeeds(w, h, hexR, 80);
 
       var finalSeeds = [];
+      ghostSeeds = [];
+
       var inShape = function(p) {
         if (cfg.shape === 'blob') return pointInBlobMargin(p, cfg.spacing * 0.5);
         if (cfg.shape === 'hexcluster') {
-          // Double lobe / butterfly footprint matching the target image
+          // Double lobe footprint matching the target image
           var d1 = dist(p, { x: w * 0.32, y: h * 0.5 });
           var d2 = dist(p, { x: w * 0.68, y: h * 0.5 });
           var rLobe = Math.min(w, h) * 0.44;
@@ -683,14 +691,24 @@
         return minD;
       }
 
-      // Outer ring: regular hex grid
-      for (var i = 0; i < hexList.length; i++) {
-        var p = hexList[i];
-        if (!inShape(p)) continue;
-        var d = distToFoci(p);
-        var norm = d / maxR;
-        var keepProb = smoothstep(0.08, 0.95 - dens * 0.45, norm);
-        if (Math.random() < keepProb) finalSeeds.push(p);
+      // Process regular hex grid
+      for (var i = 0; i < fullHexList.length; i++) {
+        var p = fullHexList[i];
+        if (inShape(p)) {
+          var d = distToFoci(p);
+          var norm = d / maxR;
+          var keepProb = smoothstep(0.08, 0.95 - dens * 0.45, norm);
+          if (Math.random() < keepProb) {
+            p.active = true;
+            finalSeeds.push(p);
+          } else {
+            p.active = false;
+            ghostSeeds.push(p);
+          }
+        } else {
+          p.active = false;
+          ghostSeeds.push(p);
+        }
       }
 
       // Inner dense Voronoi center(s) - Mitchell's Best-Candidate around foci
@@ -716,18 +734,24 @@
             bmd = md; best = c;
           }
         }
-        if (best) innerSeeds.push(best);
+        if (best) {
+          best.active = true;
+          innerSeeds.push(best);
+        }
       }
 
       for (var i = 0; i < innerSeeds.length; i++) finalSeeds.push(innerSeeds[i]);
 
-      if (finalSeeds.length < 4) finalSeeds = hexList.filter(inShape);
+      if (finalSeeds.length < 4) {
+        finalSeeds = fullHexList.filter(inShape).map(function(p){ p.active=true; return p; });
+      }
+
       return finalSeeds;
     }
 
     // ─── VORONOI CELLS ───────────────────────────────────────
-    function computeVoronoiCells(seeds, isUncropped) {
-      var bbox = isUncropped
+    function computeVoronoiCells(seeds, isHexCluster) {
+      var bbox = isHexCluster
         ? { xl: -120, xr: cfg.w + 120, yt: -120, yb: cfg.h + 120 }
         : { xl: 0, xr: cfg.w, yt: 0, yb: cfg.h };
 
@@ -737,6 +761,10 @@
       for (var i = 0; i < diagram.cells.length; i++) {
         var c = diagram.cells[i];
         if (!c || !c.halfedges || c.halfedges.length < 3) continue;
+
+        // In hexcluster mode, only keep cells of ACTIVE seeds
+        if (isHexCluster && (!c.site || c.site.active === false)) continue;
+
         var verts = []; var ok = true;
         for (var j = 0; j < c.halfedges.length; j++) {
           var p = c.halfedges[j].getStartpoint();
@@ -1004,7 +1032,12 @@
       setTimeout(function() {
         try {
           var isHexCluster = (cfg.shape === 'hexcluster');
-          var rawCells = computeVoronoiCells(currentSeeds, isHexCluster);
+
+          // Include ghost seeds in Voronoi computation for hexcluster to bound outer cells into 6-sided regular hexagons
+          var allSeeds = isHexCluster ? currentSeeds.concat(ghostSeeds) : currentSeeds;
+          for (var i = 0; i < currentSeeds.length; i++) currentSeeds[i].active = true;
+
+          var rawCells = computeVoronoiCells(allSeeds, isHexCluster);
           var half = cfg.spacing / 2;
           var polys = [];
           var validRawCells = [];
@@ -1016,7 +1049,7 @@
             if (cfg.shape === 'blob') {
               clipped = clampPolyToBlob(cell, 0);
             } else if (isHexCluster) {
-              // Uncropped full regular hexagons
+              // Full 6-sided regular hexagons bounded by ghost seeds
               clipped = cell;
             } else {
               clipped = clampPolyToRect(cell, 0);
@@ -1030,7 +1063,7 @@
             if (cfg.shape === 'blob') {
               if (!pointInBlobMargin(cCenter, cfg.spacing * 0.8)) continue;
             } else if (isHexCluster) {
-              // Valid cluster cell check
+              // Active cells only
             } else {
               if (cCenter.x < cfg.spacing * 0.8 || cCenter.x > cfg.w - cfg.spacing * 0.8 ||
                   cCenter.y < cfg.spacing * 0.8 || cCenter.y > cfg.h - cfg.spacing * 0.8) continue;
@@ -1107,6 +1140,7 @@
       } else if (cfg.pointerMode === 'add') {
         var pt = getPlaneHit(e);
         if (pt && pt.x >= 2 && pt.x <= cfg.w-2 && pt.y >= 2 && pt.y <= cfg.h-2) {
+          pt.active = true;
           currentSeeds.push(pt); rebuildFromSeeds();
         }
       } else if (cfg.pointerMode === 'move' && idx !== -1) {
@@ -1118,7 +1152,7 @@
       if (isDragging && dragIdx !== -1) {
         var pt = getPlaneHit(e);
         if (pt) {
-          currentSeeds[dragIdx] = { x: Math.max(2, Math.min(cfg.w-2, pt.x)), y: Math.max(2, Math.min(cfg.h-2, pt.y)) };
+          currentSeeds[dragIdx] = { x: Math.max(2, Math.min(cfg.w-2, pt.x)), y: Math.max(2, Math.min(cfg.h-2, pt.y)), active: true };
           rebuildFromSeeds();
         }
       }
@@ -1149,7 +1183,7 @@
         try {
           var parsed = JSON.parse(ev.target.result);
           if (Array.isArray(parsed) && parsed.length > 0) {
-            currentSeeds = parsed.map(function(p){ return {x:parseFloat(p.x||0),y:parseFloat(p.y||0)}; });
+            currentSeeds = parsed.map(function(p){ return {x:parseFloat(p.x||0),y:parseFloat(p.y||0), active:true}; });
             rebuildFromSeeds();
             setStatus('Imported ' + currentSeeds.length + ' seeds!', 'ok');
           } else { setStatus('Invalid JSON', 'err'); }
