@@ -574,7 +574,7 @@
       return cleanPoly(out);
     }
 
-    // ─── CLUSTER OUTER BOUNDARY OUTLINE ─────────────────────
+    // ─── CLUSTER OUTER BOUNDARY OUTLINE (EXACT CHAINED EDGE LOOP) ─
     function computeClusterOutline(polys) {
       if (!polys || polys.length === 0) return [];
       var edgeCounts = {};
@@ -616,19 +616,16 @@
         for (var i = 0; i < outerEdges.length; i++) {
           if (used[i]) continue;
           var e = outerEdges[i];
-          if (dist(curr, e.p1) < 0.5) {
+          if (dist(curr, e.p1) < 1.0) {
             curr = e.p2; loop.push(curr); used[i] = true; found = true; break;
-          } else if (dist(curr, e.p2) < 0.5) {
+          } else if (dist(curr, e.p2) < 1.0) {
             curr = e.p1; loop.push(curr); used[i] = true; found = true; break;
           }
         }
         if (!found) break;
       }
 
-      var cleaned = cleanPoly(loop);
-      var c = getCentroid(cleaned);
-      cleaned.sort(function(a, b) { return Math.atan2(a.y - c.y, a.x - c.x) - Math.atan2(b.y - c.y, b.x - c.x); });
-      return ensureCCW(cleaned);
+      return cleanPoly(loop);
     }
 
     // ─── SEED GENERATION ─────────────────────────────────────
@@ -695,7 +692,7 @@
         if (Math.random() < keepProb) finalSeeds.push(p);
       }
 
-      // Inner dense Voronoi center(s)
+      // Inner dense Voronoi center(s) - Mitchell's Best-Candidate around foci
       var innerCount = Math.round(n * dens * 1.6);
       var r2 = maxR * (1.0 - dens * 0.45);
       var innerSeeds = [];
@@ -708,9 +705,15 @@
           var radius = Math.random() * r2 * 0.85;
           var c = { x: targetFocus.x + radius*Math.cos(angle), y: targetFocus.y + radius*Math.sin(angle) };
           if (!inShape(c)) continue;
-          var md = distToFoci(c);
-          for (var j = 0; j < innerSeeds.length; j++) { var dd=dist(c, innerSeeds[j]); if(dd<md) md=dd; }
-          if (md > bmd) { bmd = md; best = c; }
+          
+          var md = Infinity;
+          for (var j = 0; j < innerSeeds.length; j++) {
+            var dd = dist(c, innerSeeds[j]);
+            if (dd < md) md = dd;
+          }
+          if (md === Infinity || md > bmd) {
+            bmd = md; best = c;
+          }
         }
         if (best) innerSeeds.push(best);
       }
