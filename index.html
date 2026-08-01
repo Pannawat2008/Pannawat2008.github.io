@@ -489,7 +489,7 @@
       return { x: cx / pts.length, y: cy / pts.length };
     }
 
-    // ─── ORGANIC BLOB BOUNDS ─────────────────────────────────
+    // ─── ORGANIC BLOB MATH (CORRECTED ELLIPSE POLAR RADIUS) ───
     function getBlobBounds() {
       var cx = cfg.w / 2, cy = cfg.h / 2;
       var rx = cfg.w * 0.44, ry = cfg.h * 0.43;
@@ -497,24 +497,28 @@
       return { cx: cx, cy: cy, rx: rx, ry: ry, bumpAmp: bumpAmp, bumpFreq: bumpFreq };
     }
 
+    function getBlobRadiusAtAngle(angle) {
+      var b = getBlobBounds();
+      var bump = 1 + b.bumpAmp * Math.sin(b.bumpFreq * angle + 0.5);
+      var rx = b.rx * bump, ry = b.ry * bump;
+      var cos = Math.cos(angle), sin = Math.sin(angle);
+      // Correct polar radius formula for an ellipse:
+      var denom = Math.sqrt(Math.pow(ry * cos, 2) + Math.pow(rx * sin, 2));
+      return (denom > 1e-6) ? (rx * ry) / denom : Math.min(rx, ry);
+    }
+
     function getBlobPoints(N) {
       var b = getBlobBounds();
       var pts = [];
       for (var i = 0; i < N; i++) {
         var angle = (i / N) * Math.PI * 2;
-        var bump = 1 + b.bumpAmp * Math.sin(b.bumpFreq * angle + 0.5);
+        var r = getBlobRadiusAtAngle(angle);
         pts.push({
-          x: b.cx + b.rx * bump * Math.cos(angle),
-          y: b.cy + b.ry * bump * Math.sin(angle)
+          x: b.cx + r * Math.cos(angle),
+          y: b.cy + r * Math.sin(angle)
         });
       }
       return pts;
-    }
-
-    function getBlobRadiusAtAngle(angle) {
-      var b = getBlobBounds();
-      var bump = 1 + b.bumpAmp * Math.sin(b.bumpFreq * angle + 0.5);
-      return Math.sqrt(Math.pow(b.rx * bump * Math.cos(angle), 2) + Math.pow(b.ry * bump * Math.sin(angle), 2));
     }
 
     function pointInBlobMargin(p, margin) {
@@ -525,38 +529,21 @@
       return Math.sqrt(dx * dx + dy * dy) <= maxDist;
     }
 
-    // ─── POLYGON CLIPPING TO BOUNDARY ───────────────────────
-    function clipPolyToRect(poly, w, h) {
-      function clipEdge(pts, ax, ay, bx, by) {
-        var out = [];
-        var n = pts.length;
-        if (n === 0) return out;
-        for (var i = 0; i < n; i++) {
-          var c = pts[i], d = pts[(i + 1) % n];
-          var cIn = (bx - ax) * (c.y - ay) - (by - ay) * (c.x - ax) >= 0;
-          var dIn = (bx - ax) * (d.y - ay) - (by - ay) * (d.x - ax) >= 0;
-          if (cIn) out.push(c);
-          if (cIn !== dIn) {
-            var dx1 = c.x - d.x, dy1 = c.y - d.y;
-            var dx2 = ax - bx, dy2 = ay - by;
-            var den = dx1 * dy2 - dy1 * dx2;
-            if (Math.abs(den) > 1e-6) {
-              var t = ((c.x - ax) * dy2 - (c.y - ay) * dx2) / den;
-              out.push({ x: c.x - t * dx1, y: c.y - t * dy1 });
-            }
-          }
-        }
-        return out;
+    // ─── STRICT POLYGON BOUNDARY CLAMPING ────────────────────
+    function clampPolyToRect(poly, margin) {
+      var minX = margin, maxX = cfg.w - margin;
+      var minY = margin, maxY = cfg.h - margin;
+      var out = [];
+      for (var i = 0; i < poly.length; i++) {
+        out.push({
+          x: Math.max(minX, Math.min(maxX, poly[i].x)),
+          y: Math.max(minY, Math.min(maxY, poly[i].y))
+        });
       }
-      var res = poly;
-      res = clipEdge(res, 0, 0, w, 0);     // Top
-      res = clipEdge(res, w, 0, w, h);     // Right
-      res = clipEdge(res, w, h, 0, h);     // Bottom
-      res = clipEdge(res, 0, h, 0, 0);     // Left
-      return cleanPoly(res);
+      return cleanPoly(out);
     }
 
-    function clipPolyToBlob(poly) {
+    function clampPolyToBlob(poly, margin) {
       var b = getBlobBounds();
       var out = [];
       for (var i = 0; i < poly.length; i++) {
@@ -564,7 +551,7 @@
         var dx = p.x - b.cx, dy = p.y - b.cy;
         var d = Math.sqrt(dx * dx + dy * dy);
         var angle = Math.atan2(dy, dx);
-        var maxR = getBlobRadiusAtAngle(angle);
+        var maxR = getBlobRadiusAtAngle(angle) - (margin || 0);
         if (d > maxR && d > 1e-5) {
           out.push({
             x: b.cx + maxR * Math.cos(angle),
@@ -643,7 +630,6 @@
 
     // ─── VORONOI CELLS ───────────────────────────────────────
     function computeVoronoiCells(seeds) {
-      // Use exact 0 to w, 0 to h bbox for voronoi diagram so edges are properly bounded
       var bbox = { xl: 0, xr: cfg.w, yt: 0, yb: cfg.h };
       var voronoi = new Voronoi();
       var diagram = voronoi.compute(seeds, bbox);
@@ -904,23 +890,28 @@
           for (var i = 0; i < rawCells.length; i++) {
             var cell = ensureCCW(rawCells[i]);
 
-            // 1. Clip raw Voronoi cell to active outer shape
-            var clipped = (cfg.shape === 'blob') ? clipPolyToBlob(cell) : clipPolyToRect(cell, cfg.w, cfg.h);
+            // 1. Initial clamp to boundary
+            var clipped = (cfg.shape === 'blob') ? clampPolyToBlob(cell, 0) : clampPolyToRect(cell, 0);
             if (!clipped || clipped.length < 3) continue;
 
             var cCenter = getCentroid(clipped);
 
-            // Filter out cells whose centroid falls outside the margin boundary
+            // Filter out cells whose centroid is outside margin
             if (cfg.shape === 'blob') {
               if (!pointInBlobMargin(cCenter, cfg.spacing * 0.8)) continue;
             } else {
-              if (cCenter.x < cfg.spacing * 0.5 || cCenter.x > cfg.w - cfg.spacing * 0.5 ||
-                  cCenter.y < cfg.spacing * 0.5 || cCenter.y > cfg.h - cfg.spacing * 0.5) continue;
+              if (cCenter.x < cfg.spacing * 0.8 || cCenter.x > cfg.w - cfg.spacing * 0.8 ||
+                  cCenter.y < cfg.spacing * 0.8 || cCenter.y > cfg.h - cfg.spacing * 0.8) continue;
             }
 
             // 2. Retract for wall thickness
             var ret = retractPolygon(clipped, half);
             if (!ret || ret.length < 3 || Math.abs(polygonArea(ret)) < 10) continue;
+
+            // 3. Final safety clamp to shape margin (100% guarantees no vertex leaks outside margin!)
+            ret = (cfg.shape === 'blob') ? clampPolyToBlob(ret, half) : clampPolyToRect(ret, half);
+            if (!ret || ret.length < 3) continue;
+
             if (cfg.curve === 'fillet') ret = applyFillets(ret);
             polys.push(ret);
           }
