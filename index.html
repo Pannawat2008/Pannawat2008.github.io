@@ -581,8 +581,8 @@
       var edgeMap = {};
 
       function key(p1, p2) {
-        var k1 = (Math.round(p1.x*10)/10).toFixed(1)+','+(Math.round(p1.y*10)/10).toFixed(1);
-        var k2 = (Math.round(p2.x*10)/10).toFixed(1)+','+(Math.round(p2.y*10)/10).toFixed(1);
+        var k1 = (Math.round(p1.x*5)/5).toFixed(1)+','+(Math.round(p1.y*5)/5).toFixed(1);
+        var k2 = (Math.round(p2.x*5)/5).toFixed(1)+','+(Math.round(p2.y*5)/5).toFixed(1);
         return k1 < k2 ? k1+'_'+k2 : k2+'_'+k1;
       }
 
@@ -616,9 +616,9 @@
         for (var i = 0; i < outerEdges.length; i++) {
           if (used[i]) continue;
           var e = outerEdges[i];
-          if (dist(curr, e.p1) < 1.0) {
+          if (dist(curr, e.p1) < 1.5) {
             curr = e.p2; loop.push(curr); used[i] = true; found = true; break;
-          } else if (dist(curr, e.p2) < 1.0) {
+          } else if (dist(curr, e.p2) < 1.5) {
             curr = e.p1; loop.push(curr); used[i] = true; found = true; break;
           }
         }
@@ -632,10 +632,10 @@
     function hexSeeds(w, h, r) {
       var seeds = [];
       var dx = r * Math.sqrt(3), dy = r * 1.5;
-      var cols = Math.ceil(w/dx)+4, rows = Math.ceil(h/dy)+4;
-      for (var row = -2; row < rows; row++) {
+      var cols = Math.ceil(w/dx)+6, rows = Math.ceil(h/dy)+6;
+      for (var row = -3; row < rows; row++) {
         var xOff = (row % 2 !== 0) ? dx/2 : 0;
-        for (var col = -2; col < cols; col++) {
+        for (var col = -3; col < cols; col++) {
           var x = col*dx + xOff, y = row*dy;
           seeds.push({x:x, y:y});
         }
@@ -656,10 +656,11 @@
       var inShape = function(p) {
         if (cfg.shape === 'blob') return pointInBlobMargin(p, cfg.spacing * 0.5);
         if (cfg.shape === 'hexcluster') {
+          // Double lobe / butterfly footprint matching the target image
           var d1 = dist(p, { x: w * 0.32, y: h * 0.5 });
           var d2 = dist(p, { x: w * 0.68, y: h * 0.5 });
-          var rLobe = Math.min(w, h) * 0.46;
-          return (d1 <= rLobe || d2 <= rLobe) && p.x >= 12 && p.x <= w - 12 && p.y >= 12 && p.y <= h - 12;
+          var rLobe = Math.min(w, h) * 0.44;
+          return (d1 <= rLobe || d2 <= rLobe);
         }
         return p.x >= cfg.spacing && p.x <= w - cfg.spacing && p.y >= cfg.spacing && p.y <= h - cfg.spacing;
       };
@@ -725,8 +726,10 @@
     }
 
     // ─── VORONOI CELLS ───────────────────────────────────────
-    function computeVoronoiCells(seeds) {
-      var bbox = { xl: 0, xr: cfg.w, yt: 0, yb: cfg.h };
+    function computeVoronoiCells(seeds, isUncropped) {
+      var bbox = isUncropped
+        ? { xl: -120, xr: cfg.w + 120, yt: -120, yb: cfg.h + 120 }
+        : { xl: 0, xr: cfg.w, yt: 0, yb: cfg.h };
 
       var voronoi = new Voronoi();
       var diagram = voronoi.compute(seeds, bbox);
@@ -806,10 +809,22 @@
       var pane = document.getElementById('pane-2d');
       var pw = pane.clientWidth || 400;
       var ph = pane.clientHeight || 300;
-      
-      var scale = Math.min((pw - 30) / cfg.w, (ph - 30) / cfg.h);
-      var offX = (pw - cfg.w * scale) / 2;
-      var offY = (ph - cfg.h * scale) / 2;
+
+      // Compute bounding box of active model
+      var minX = 0, maxX = cfg.w, minY = 0, maxY = cfg.h;
+      if (cfg.shape === 'hexcluster' && clusterBoundaryPoly.length >= 3) {
+        minX = Infinity; maxX = -Infinity; minY = Infinity; maxY = -Infinity;
+        for (var i = 0; i < clusterBoundaryPoly.length; i++) {
+          var pt = clusterBoundaryPoly[i];
+          if (pt.x < minX) minX = pt.x; if (pt.x > maxX) maxX = pt.x;
+          if (pt.y < minY) minY = pt.y; if (pt.y > maxY) maxY = pt.y;
+        }
+      }
+
+      var modelW = maxX - minX, modelH = maxY - minY;
+      var scale = Math.min((pw - 40) / modelW, (ph - 40) / modelH);
+      var offX = (pw - modelW * scale) / 2 - minX * scale;
+      var offY = (ph - modelH * scale) / 2 - minY * scale;
 
       function toSvgX(x) { return offX + x * scale; }
       function toSvgY(y) { return offY + y * scale; }
@@ -824,7 +839,7 @@
           d += ' L ' + toSvgX(clusterBoundaryPoly[i].x).toFixed(1) + ' ' + toSvgY(clusterBoundaryPoly[i].y).toFixed(1);
         }
         d += ' Z';
-        parts.push('<path d="' + d + '" fill="#FAFAFA" stroke="#444" stroke-width="2.5" stroke-linejoin="round"/>');
+        parts.push('<path d="' + d + '" fill="#FAFAFA" stroke="#333" stroke-width="2.5" stroke-linejoin="round"/>');
       } else if (cfg.shape === 'blob') {
         var bpts = getBlobPoints(64);
         var d = 'M ' + toSvgX(bpts[0].x).toFixed(1) + ' ' + toSvgY(bpts[0].y).toFixed(1);
@@ -855,7 +870,7 @@
           var s = currentSeeds[i];
           var inBounds = (cfg.shape === 'blob')
             ? pointInBlobMargin(s, 0)
-            : (s.x >= 0 && s.x <= cfg.w && s.y >= 0 && s.y <= cfg.h);
+            : (s.x >= -30 && s.x <= cfg.w + 30 && s.y >= -30 && s.y <= cfg.h + 30);
           if (inBounds) {
             parts.push('<circle cx="' + toSvgX(s.x).toFixed(1) + '" cy="' + toSvgY(s.y).toFixed(1) + '" r="2.2" fill="#111"/>');
           }
@@ -883,7 +898,7 @@
         var s = currentSeeds[i];
         var inBounds = (cfg.shape === 'blob')
           ? pointInBlobMargin(s, 0)
-          : (s.x >= 0 && s.x <= cfg.w && s.y >= 0 && s.y <= cfg.h);
+          : (s.x >= -30 && s.x <= cfg.w + 30 && s.y >= -30 && s.y <= cfg.h + 30);
         if (!inBounds) continue;
         var mesh = new THREE.Mesh(sg, sm);
         mesh.position.set(s.x - cfg.w/2, topY, s.y - cfg.h/2);
@@ -989,7 +1004,7 @@
       setTimeout(function() {
         try {
           var isHexCluster = (cfg.shape === 'hexcluster');
-          var rawCells = computeVoronoiCells(currentSeeds);
+          var rawCells = computeVoronoiCells(currentSeeds, isHexCluster);
           var half = cfg.spacing / 2;
           var polys = [];
           var validRawCells = [];
@@ -997,20 +1012,25 @@
           for (var i = 0; i < rawCells.length; i++) {
             var cell = ensureCCW(rawCells[i]);
 
-            // Clamp cell to panel bounding box
-            var clipped = (cfg.shape === 'blob')
-              ? clampPolyToBlob(cell, 0)
-              : clampPolyToRect(cell, 0);
+            var clipped;
+            if (cfg.shape === 'blob') {
+              clipped = clampPolyToBlob(cell, 0);
+            } else if (isHexCluster) {
+              // Uncropped full regular hexagons
+              clipped = cell;
+            } else {
+              clipped = clampPolyToRect(cell, 0);
+            }
 
             if (!clipped || clipped.length < 3) continue;
 
             var cCenter = getCentroid(clipped);
 
-            // Filter out cells whose centroid is outside margin
+            // Filter out cells whose centroid is outside active margin
             if (cfg.shape === 'blob') {
               if (!pointInBlobMargin(cCenter, cfg.spacing * 0.8)) continue;
             } else if (isHexCluster) {
-              if (cCenter.x < 12 || cCenter.x > cfg.w - 12 || cCenter.y < 12 || cCenter.y > cfg.h - 12) continue;
+              // Valid cluster cell check
             } else {
               if (cCenter.x < cfg.spacing * 0.8 || cCenter.x > cfg.w - cfg.spacing * 0.8 ||
                   cCenter.y < cfg.spacing * 0.8 || cCenter.y > cfg.h - cfg.spacing * 0.8) continue;
@@ -1018,11 +1038,11 @@
 
             validRawCells.push(clipped);
 
-            // 2. Retract for wall thickness
+            // Retract for wall thickness
             var ret = retractPolygon(clipped, half);
             if (!ret || ret.length < 3 || Math.abs(polygonArea(ret)) < 10) continue;
 
-            // 3. Final safety clamp for rect and blob
+            // Final safety clamp ONLY for rect and blob
             if (cfg.shape === 'blob') {
               ret = clampPolyToBlob(ret, half);
             } else if (cfg.shape === 'rect') {
@@ -1188,7 +1208,7 @@
       }
       for (var i=0;i<currentSeeds.length;i++) {
         var s = currentSeeds[i];
-        var inBounds = (cfg.shape === 'blob') ? pointInBlobMargin(s, 0) : (s.x >= 0 && s.x <= cfg.w && s.y >= 0 && s.y <= cfg.h);
+        var inBounds = (cfg.shape === 'blob') ? pointInBlobMargin(s, 0) : (s.x >= -30 && s.x <= cfg.w + 30 && s.y >= -30 && s.y <= cfg.h + 30);
         if (inBounds) paths += '<circle cx="'+s.x.toFixed(2)+'" cy="'+s.y.toFixed(2)+'" r="1" fill="#000"/>\n';
       }
       var svg = '<?xml version="1.0" encoding="UTF-8"?><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 '+cfg.w+' '+cfg.h+'" width="'+cfg.w+'mm" height="'+cfg.h+'mm">\n'+paths+'</svg>';
