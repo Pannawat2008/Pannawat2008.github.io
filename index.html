@@ -525,6 +525,58 @@
       return Math.sqrt(dx * dx + dy * dy) <= maxDist;
     }
 
+    // ─── POLYGON CLIPPING TO BOUNDARY ───────────────────────
+    function clipPolyToRect(poly, w, h) {
+      function clipEdge(pts, ax, ay, bx, by) {
+        var out = [];
+        var n = pts.length;
+        if (n === 0) return out;
+        for (var i = 0; i < n; i++) {
+          var c = pts[i], d = pts[(i + 1) % n];
+          var cIn = (bx - ax) * (c.y - ay) - (by - ay) * (c.x - ax) >= 0;
+          var dIn = (bx - ax) * (d.y - ay) - (by - ay) * (d.x - ax) >= 0;
+          if (cIn) out.push(c);
+          if (cIn !== dIn) {
+            var dx1 = c.x - d.x, dy1 = c.y - d.y;
+            var dx2 = ax - bx, dy2 = ay - by;
+            var den = dx1 * dy2 - dy1 * dx2;
+            if (Math.abs(den) > 1e-6) {
+              var t = ((c.x - ax) * dy2 - (c.y - ay) * dx2) / den;
+              out.push({ x: c.x - t * dx1, y: c.y - t * dy1 });
+            }
+          }
+        }
+        return out;
+      }
+      var res = poly;
+      res = clipEdge(res, 0, 0, w, 0);     // Top
+      res = clipEdge(res, w, 0, w, h);     // Right
+      res = clipEdge(res, w, h, 0, h);     // Bottom
+      res = clipEdge(res, 0, h, 0, 0);     // Left
+      return cleanPoly(res);
+    }
+
+    function clipPolyToBlob(poly) {
+      var b = getBlobBounds();
+      var out = [];
+      for (var i = 0; i < poly.length; i++) {
+        var p = poly[i];
+        var dx = p.x - b.cx, dy = p.y - b.cy;
+        var d = Math.sqrt(dx * dx + dy * dy);
+        var angle = Math.atan2(dy, dx);
+        var maxR = getBlobRadiusAtAngle(angle);
+        if (d > maxR && d > 1e-5) {
+          out.push({
+            x: b.cx + maxR * Math.cos(angle),
+            y: b.cy + maxR * Math.sin(angle)
+          });
+        } else {
+          out.push({ x: p.x, y: p.y });
+        }
+      }
+      return cleanPoly(out);
+    }
+
     // ─── SEED GENERATION ─────────────────────────────────────
     function hexSeeds(w, h, r) {
       var seeds = [];
@@ -591,9 +643,8 @@
 
     // ─── VORONOI CELLS ───────────────────────────────────────
     function computeVoronoiCells(seeds) {
-      // Large bounding box so outer cells are not prematurely cropped by artificial rectangle
-      var margin = 40;
-      var bbox = { xl: -margin, xr: cfg.w + margin, yt: -margin, yb: cfg.h + margin };
+      // Use exact 0 to w, 0 to h bbox for voronoi diagram so edges are properly bounded
+      var bbox = { xl: 0, xr: cfg.w, yt: 0, yb: cfg.h };
       var voronoi = new Voronoi();
       var diagram = voronoi.compute(seeds, bbox);
       var cells = [];
@@ -622,13 +673,12 @@
       return cells;
     }
 
-    // ─── PROPORTIONAL CELL RETRACTION (EVEN WALLS, UNWARPED HEXES) ─
+    // ─── PROPORTIONAL CELL RETRACTION ────────────────────────
     function retractPolygon(verts, d) {
       if (verts.length < 3 || d <= 0) return verts;
       var c = getCentroid(verts);
       var n = verts.length;
 
-      // Calculate inradius (distance to closest edge)
       var minInradius = Infinity;
       for (var i = 0; i < n; i++) {
         var v1 = verts[i], v2 = verts[(i + 1) % n];
@@ -641,7 +691,7 @@
 
       if (minInradius < 0.5 || minInradius === Infinity) return [];
 
-      var scale = Math.max(0.08, 1.0 - d / minInradius);
+      var scale = Math.max(0.05, 1.0 - d / minInradius);
       var out = [];
       for (var i = 0; i < n; i++) {
         out.push({
@@ -710,11 +760,16 @@
         parts.push('<path d="' + pd + '" fill="#ffffff" stroke="#222" stroke-width="1.2" stroke-linejoin="round"/>');
       }
 
-      // Draw seed dots
+      // Draw seed dots (filtered inside shape)
       if (cfg.showSeeds) {
         for (var i = 0; i < currentSeeds.length; i++) {
           var s = currentSeeds[i];
-          parts.push('<circle cx="' + toSvgX(s.x).toFixed(1) + '" cy="' + toSvgY(s.y).toFixed(1) + '" r="2.2" fill="#111"/>');
+          var inBounds = (cfg.shape === 'blob')
+            ? pointInBlobMargin(s, 0)
+            : (s.x >= 0 && s.x <= cfg.w && s.y >= 0 && s.y <= cfg.h);
+          if (inBounds) {
+            parts.push('<circle cx="' + toSvgX(s.x).toFixed(1) + '" cy="' + toSvgY(s.y).toFixed(1) + '" r="2.2" fill="#111"/>');
+          }
         }
       }
 
@@ -737,6 +792,10 @@
       var topY = cfg.depth / 2.0 + 1.0;
       for (var i = 0; i < currentSeeds.length; i++) {
         var s = currentSeeds[i];
+        var inBounds = (cfg.shape === 'blob')
+          ? pointInBlobMargin(s, 0)
+          : (s.x >= 0 && s.x <= cfg.w && s.y >= 0 && s.y <= cfg.h);
+        if (!inBounds) continue;
         var mesh = new THREE.Mesh(sg, sm);
         mesh.position.set(s.x - cfg.w/2, topY, s.y - cfg.h/2);
         mesh.userData = { seedIndex: i };
@@ -844,18 +903,23 @@
 
           for (var i = 0; i < rawCells.length; i++) {
             var cell = ensureCCW(rawCells[i]);
-            var cCenter = getCentroid(cell);
 
-            // Filter out cells that fall outside the margin boundary
+            // 1. Clip raw Voronoi cell to active outer shape
+            var clipped = (cfg.shape === 'blob') ? clipPolyToBlob(cell) : clipPolyToRect(cell, cfg.w, cfg.h);
+            if (!clipped || clipped.length < 3) continue;
+
+            var cCenter = getCentroid(clipped);
+
+            // Filter out cells whose centroid falls outside the margin boundary
             if (cfg.shape === 'blob') {
-              if (!pointInBlobMargin(cCenter, cfg.spacing * 1.2)) continue;
+              if (!pointInBlobMargin(cCenter, cfg.spacing * 0.8)) continue;
             } else {
-              if (cCenter.x < cfg.spacing || cCenter.x > cfg.w - cfg.spacing ||
-                  cCenter.y < cfg.spacing || cCenter.y > cfg.h - cfg.spacing) continue;
+              if (cCenter.x < cfg.spacing * 0.5 || cCenter.x > cfg.w - cfg.spacing * 0.5 ||
+                  cCenter.y < cfg.spacing * 0.5 || cCenter.y > cfg.h - cfg.spacing * 0.5) continue;
             }
 
-            // Retract for wall thickness preserving natural hexagon scaling
-            var ret = retractPolygon(cell, half);
+            // 2. Retract for wall thickness
+            var ret = retractPolygon(clipped, half);
             if (!ret || ret.length < 3 || Math.abs(polygonArea(ret)) < 10) continue;
             if (cfg.curve === 'fillet') ret = applyFillets(ret);
             polys.push(ret);
@@ -1002,7 +1066,9 @@
         paths += '<path d="'+d+'" fill="none" stroke="#000" stroke-width="1.2"/>\n';
       }
       for (var i=0;i<currentSeeds.length;i++) {
-        paths += '<circle cx="'+currentSeeds[i].x.toFixed(2)+'" cy="'+currentSeeds[i].y.toFixed(2)+'" r="1" fill="#000"/>\n';
+        var s = currentSeeds[i];
+        var inBounds = (cfg.shape === 'blob') ? pointInBlobMargin(s, 0) : (s.x >= 0 && s.x <= cfg.w && s.y >= 0 && s.y <= cfg.h);
+        if (inBounds) paths += '<circle cx="'+s.x.toFixed(2)+'" cy="'+s.y.toFixed(2)+'" r="1" fill="#000"/>\n';
       }
       var svg = '<?xml version="1.0" encoding="UTF-8"?><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 '+cfg.w+' '+cfg.h+'" width="'+cfg.w+'mm" height="'+cfg.h+'mm">\n'+paths+'</svg>';
       var a = document.createElement('a');
