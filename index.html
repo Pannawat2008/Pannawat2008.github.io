@@ -786,33 +786,54 @@
       return cells;
     }
 
-    // ─── PROPORTIONAL CELL RETRACTION ────────────────────────
-    function retractPolygon(verts, d) {
-      if (verts.length < 3 || d <= 0) return verts;
-      var c = getCentroid(verts);
-      var n = verts.length;
+    // ─── EXACT PARALLEL MITER INSET FOR UNIFORM WALL SPACING ─
+    function offsetPolygonInward(verts, d) {
+      if (!verts || verts.length < 3 || d <= 0) return verts;
+      var pts = ensureCCW(verts);
+      var n = pts.length;
+      if (n < 3) return pts;
 
-      var minInradius = Infinity;
+      var normals = [];
       for (var i = 0; i < n; i++) {
-        var v1 = verts[i], v2 = verts[(i + 1) % n];
-        var dx = v2.x - v1.x, dy = v2.y - v1.y;
+        var p1 = pts[i], p2 = pts[(i + 1) % n];
+        var dx = p2.x - p1.x, dy = p2.y - p1.y;
         var len = Math.sqrt(dx * dx + dy * dy);
-        if (len < 1e-6) continue;
-        var edgeDist = Math.abs((v2.x - v1.x) * (c.y - v1.y) - (v2.y - v1.y) * (c.x - v1.x)) / len;
-        if (edgeDist < minInradius) minInradius = edgeDist;
+        if (len < 1e-6) {
+          normals.push({ x: 0, y: 0 });
+        } else {
+          // CCW inward normal: (-dy/len, dx/len)
+          normals.push({ x: -dy / len, y: dx / len });
+        }
       }
 
-      if (minInradius < 0.5 || minInradius === Infinity) return [];
-
-      var scale = Math.max(0.05, 1.0 - d / minInradius);
       var out = [];
       for (var i = 0; i < n; i++) {
+        var nPrev = normals[(i + n - 1) % n];
+        var nCurr = normals[i];
+
+        var bx = nPrev.x + nCurr.x;
+        var by = nPrev.y + nCurr.y;
+        var blen = Math.sqrt(bx * bx + by * by);
+
+        if (blen < 1e-6) {
+          out.push({ x: pts[i].x + nCurr.x * d, y: pts[i].y + nCurr.y * d });
+          continue;
+        }
+
+        bx /= blen; by /= blen;
+        var dot = bx * nCurr.x + by * nCurr.y;
+        if (dot < 0.15) dot = 0.15; // clamp sharp miters
+
+        var miter = d / dot;
+        if (miter > 3.5 * d) miter = 3.5 * d; // prevent spike artifacts
+
         out.push({
-          x: c.x + (verts[i].x - c.x) * scale,
-          y: c.y + (verts[i].y - c.y) * scale
+          x: pts[i].x + bx * miter,
+          y: pts[i].y + by * miter
         });
       }
 
+      if (polygonArea(out) <= 5.0) return [];
       return cleanPoly(out);
     }
 
@@ -1071,8 +1092,8 @@
 
             validRawCells.push(clipped);
 
-            // Retract for wall thickness
-            var ret = retractPolygon(clipped, half);
+            // Retract for wall thickness using exact parallel miter inset
+            var ret = offsetPolygonInward(clipped, half);
             if (!ret || ret.length < 3 || Math.abs(polygonArea(ret)) < 10) continue;
 
             // Final safety clamp ONLY for rect and blob
