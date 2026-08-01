@@ -266,6 +266,15 @@
           <div class="seg" id="seg-shape">
             <button class="seg-btn active" data-v="rect">Rectangle</button>
             <button class="seg-btn" data-v="blob">Organic Blob</button>
+            <button class="seg-btn" data-v="hexcluster">Hex Border</button>
+          </div>
+        </div>
+
+        <div class="ctrl">
+          <div class="lrow" style="margin-bottom:4px">Focal Cores</div>
+          <div class="seg" id="seg-foci">
+            <button class="seg-btn active" data-v="single">Single Core</button>
+            <button class="seg-btn" data-v="dual">Dual Core</button>
           </div>
         </div>
 
@@ -281,7 +290,7 @@
 
         <div class="ctrl">
           <div class="lrow"><span>Seed Count</span><span class="lval" id="v-seeds">50</span></div>
-          <input type="range" id="s-seeds" min="8" max="120" value="50" step="1">
+          <input type="range" id="s-seeds" min="8" max="150" value="50" step="1">
         </div>
 
         <div class="ctrl">
@@ -402,13 +411,16 @@
       mode: 'walls',
       curve: 'fillet',
       color: '#4285F4',
-      shape: 'rect',
+      shape: 'rect',       // 'rect', 'blob', or 'hexcluster'
+      foci: 'single',      // 'single' or 'dual'
       pointerMode: 'navigate',
       showSeeds: true
     };
 
     var currentSeeds = [];
     var cellPolygons = [];
+    var unretractedCells = [];
+    var clusterBoundaryPoly = [];
 
     // ─── THREE.JS ────────────────────────────────────────────
     var canvas = document.getElementById('canvas3d');
@@ -489,7 +501,7 @@
       return { x: cx / pts.length, y: cy / pts.length };
     }
 
-    // ─── ORGANIC BLOB MATH (CORRECTED ELLIPSE POLAR RADIUS) ───
+    // ─── ORGANIC BLOB MATH ───────────────────────────────────
     function getBlobBounds() {
       var cx = cfg.w / 2, cy = cfg.h / 2;
       var rx = cfg.w * 0.44, ry = cfg.h * 0.43;
@@ -502,7 +514,6 @@
       var bump = 1 + b.bumpAmp * Math.sin(b.bumpFreq * angle + 0.5);
       var rx = b.rx * bump, ry = b.ry * bump;
       var cos = Math.cos(angle), sin = Math.sin(angle);
-      // Correct polar radius formula for an ellipse:
       var denom = Math.sqrt(Math.pow(ry * cos, 2) + Math.pow(rx * sin, 2));
       return (denom > 1e-6) ? (rx * ry) / denom : Math.min(rx, ry);
     }
@@ -529,7 +540,7 @@
       return Math.sqrt(dx * dx + dy * dy) <= maxDist;
     }
 
-    // ─── STRICT POLYGON BOUNDARY CLAMPING ────────────────────
+    // ─── POLYGON BOUNDARY CLAMPING ───────────────────────────
     function clampPolyToRect(poly, margin) {
       var minX = margin, maxX = cfg.w - margin;
       var minY = margin, maxY = cfg.h - margin;
@@ -564,6 +575,67 @@
       return cleanPoly(out);
     }
 
+    // ─── CLUSTER OUTER BOUNDARY OUTLINE ─────────────────────
+    // Computes the exact stepped honeycomb perimeter from the un-retracted outer cells
+    function computeClusterOutline(polys) {
+      if (!polys || polys.length === 0) return [];
+      var edgeCounts = {};
+      var edgeMap = {};
+
+      function key(p1, p2) {
+        var k1 = (Math.round(p1.x*10)/10).toFixed(1)+','+(Math.round(p1.y*10)/10).toFixed(1);
+        var k2 = (Math.round(p2.x*10)/10).toFixed(1)+','+(Math.round(p2.y*10)/10).toFixed(1);
+        return k1 < k2 ? k1+'_'+k2 : k2+'_'+k1;
+      }
+
+      for (var i = 0; i < polys.length; i++) {
+        var p = polys[i];
+        for (var j = 0; j < p.length; j++) {
+          var p1 = p[j], p2 = p[(j+1)%p.length];
+          var k = key(p1, p2);
+          if (!edgeCounts[k]) {
+            edgeCounts[k] = 1;
+            edgeMap[k] = { p1: p1, p2: p2 };
+          } else {
+            edgeCounts[k]++;
+          }
+        }
+      }
+
+      // Outer boundary edges appear in exactly 1 cell
+      var outerEdges = [];
+      for (var k in edgeCounts) {
+        if (edgeCounts[k] === 1) outerEdges.push(edgeMap[k]);
+      }
+      if (outerEdges.length === 0) return [];
+
+      // Chain edges into closed loop
+      var loop = [];
+      var curr = outerEdges[0].p1;
+      loop.push(curr);
+      var used = new Array(outerEdges.length).fill(false);
+
+      for (var step = 0; step < outerEdges.length; step++) {
+        var found = false;
+        for (var i = 0; i < outerEdges.length; i++) {
+          if (used[i]) continue;
+          var e = outerEdges[i];
+          if (dist(curr, e.p1) < 0.5) {
+            curr = e.p2; loop.push(curr); used[i] = true; found = true; break;
+          } else if (dist(curr, e.p2) < 0.5) {
+            curr = e.p1; loop.push(curr); used[i] = true; found = true; break;
+          }
+        }
+        if (!found) break;
+      }
+
+      var cleaned = cleanPoly(loop);
+      // Sort CCW
+      var c = getCentroid(cleaned);
+      cleaned.sort(function(a, b) { return Math.atan2(a.y - c.y, a.x - c.x) - Math.atan2(b.y - c.y, b.x - c.x); });
+      return ensureCCW(cleaned);
+    }
+
     // ─── SEED GENERATION ─────────────────────────────────────
     function hexSeeds(w, h, r) {
       var seeds = [];
@@ -591,31 +663,52 @@
       var finalSeeds = [];
       var inShape = function(p) {
         if (cfg.shape === 'blob') return pointInBlobMargin(p, cfg.spacing * 0.5);
+        if (cfg.shape === 'hexcluster') return p.x >= 10 && p.x <= w-10 && p.y >= 10 && p.y <= h-10;
         return p.x >= cfg.spacing && p.x <= w - cfg.spacing && p.y >= cfg.spacing && p.y <= h - cfg.spacing;
       };
+
+      // Foci setup: Single Focus (center) vs Dual Focus (left & right twin cores)
+      var foci = [];
+      if (cfg.foci === 'dual') {
+        foci.push({ x: w * 0.32, y: h * 0.5 });
+        foci.push({ x: w * 0.68, y: h * 0.5 });
+      } else {
+        foci.push({ x: cx, y: cy });
+      }
+
+      function distToFoci(p) {
+        var minD = Infinity;
+        for (var f = 0; f < foci.length; f++) {
+          var d = dist(p, foci[f]);
+          if (d < minD) minD = d;
+        }
+        return minD;
+      }
 
       // Outer ring: regular hex grid
       for (var i = 0; i < hexList.length; i++) {
         var p = hexList[i];
         if (!inShape(p)) continue;
-        var d = dist(p, {x:cx, y:cy});
+        var d = distToFoci(p);
         var norm = d / maxR;
-        var keepProb = smoothstep(0.1, 1.0 - dens * 0.4, norm);
+        var keepProb = smoothstep(0.08, 0.95 - dens * 0.45, norm);
         if (Math.random() < keepProb) finalSeeds.push(p);
       }
 
-      // Inner dense Voronoi center
-      var innerCount = Math.round(n * dens * 1.5);
-      var r2 = maxR * (1.0 - dens * 0.4);
+      // Inner dense Voronoi center(s)
+      var innerCount = Math.round(n * dens * 1.6);
+      var r2 = maxR * (1.0 - dens * 0.45);
       var innerSeeds = [];
+
       for (var i = 0; i < innerCount; i++) {
+        var targetFocus = foci[i % foci.length];
         var best = null, bmd = -1;
         for (var s = 0; s < 25; s++) {
           var angle = Math.random() * Math.PI * 2;
           var radius = Math.random() * r2 * 0.85;
-          var c = { x: cx + radius*Math.cos(angle), y: cy + radius*Math.sin(angle) };
+          var c = { x: targetFocus.x + radius*Math.cos(angle), y: targetFocus.y + radius*Math.sin(angle) };
           if (!inShape(c)) continue;
-          var md = dist(c, {x:cx, y:cy});
+          var md = distToFoci(c);
           for (var j = 0; j < innerSeeds.length; j++) { var dd=dist(c, innerSeeds[j]); if(dd<md) md=dd; }
           if (md > bmd) { bmd = md; best = c; }
         }
@@ -722,7 +815,14 @@
       parts.push('<rect width="' + pw + '" height="' + ph + '" fill="#ffffff"/>');
 
       // Draw outer shape frame
-      if (cfg.shape === 'blob') {
+      if (cfg.shape === 'hexcluster' && clusterBoundaryPoly.length >= 3) {
+        var d = 'M ' + toSvgX(clusterBoundaryPoly[0].x).toFixed(1) + ' ' + toSvgY(clusterBoundaryPoly[0].y).toFixed(1);
+        for (var i = 1; i < clusterBoundaryPoly.length; i++) {
+          d += ' L ' + toSvgX(clusterBoundaryPoly[i].x).toFixed(1) + ' ' + toSvgY(clusterBoundaryPoly[i].y).toFixed(1);
+        }
+        d += ' Z';
+        parts.push('<path d="' + d + '" fill="#FAFAFA" stroke="#444" stroke-width="2.5" stroke-linejoin="round"/>');
+      } else if (cfg.shape === 'blob') {
         var bpts = getBlobPoints(64);
         var d = 'M ' + toSvgX(bpts[0].x).toFixed(1) + ' ' + toSvgY(bpts[0].y).toFixed(1);
         for (var i = 1; i < bpts.length; i++) {
@@ -746,7 +846,7 @@
         parts.push('<path d="' + pd + '" fill="#ffffff" stroke="#222" stroke-width="1.2" stroke-linejoin="round"/>');
       }
 
-      // Draw seed dots (filtered inside shape)
+      // Draw seed dots (filtered inside active shape)
       if (cfg.showSeeds) {
         for (var i = 0; i < currentSeeds.length; i++) {
           var s = currentSeeds[i];
@@ -815,7 +915,9 @@
         }
       } else {
         var outerPts;
-        if (cfg.shape === 'blob') {
+        if (cfg.shape === 'hexcluster' && clusterBoundaryPoly.length >= 3) {
+          outerPts = ensureCCW(clusterBoundaryPoly);
+        } else if (cfg.shape === 'blob') {
           outerPts = ensureCCW(getBlobPoints(64));
         } else {
           outerPts = ensureCCW([{x:0,y:0},{x:w,y:0},{x:w,y:h},{x:0,y:h}]);
@@ -886,12 +988,20 @@
           var rawCells = computeVoronoiCells(currentSeeds);
           var half = cfg.spacing / 2;
           var polys = [];
+          var validRawCells = [];
 
           for (var i = 0; i < rawCells.length; i++) {
             var cell = ensureCCW(rawCells[i]);
 
             // 1. Initial clamp to boundary
-            var clipped = (cfg.shape === 'blob') ? clampPolyToBlob(cell, 0) : clampPolyToRect(cell, 0);
+            var clipped;
+            if (cfg.shape === 'blob') {
+              clipped = clampPolyToBlob(cell, 0);
+            } else if (cfg.shape === 'hexcluster') {
+              clipped = cell;
+            } else {
+              clipped = clampPolyToRect(cell, 0);
+            }
             if (!clipped || clipped.length < 3) continue;
 
             var cCenter = getCentroid(clipped);
@@ -899,21 +1009,36 @@
             // Filter out cells whose centroid is outside margin
             if (cfg.shape === 'blob') {
               if (!pointInBlobMargin(cCenter, cfg.spacing * 0.8)) continue;
+            } else if (cfg.shape === 'hexcluster') {
+              if (cCenter.x < 10 || cCenter.x > cfg.w - 10 || cCenter.y < 10 || cCenter.y > cfg.h - 10) continue;
             } else {
               if (cCenter.x < cfg.spacing * 0.8 || cCenter.x > cfg.w - cfg.spacing * 0.8 ||
                   cCenter.y < cfg.spacing * 0.8 || cCenter.y > cfg.h - cfg.spacing * 0.8) continue;
             }
 
+            validRawCells.push(clipped);
+
             // 2. Retract for wall thickness
             var ret = retractPolygon(clipped, half);
             if (!ret || ret.length < 3 || Math.abs(polygonArea(ret)) < 10) continue;
 
-            // 3. Final safety clamp to shape margin (100% guarantees no vertex leaks outside margin!)
-            ret = (cfg.shape === 'blob') ? clampPolyToBlob(ret, half) : clampPolyToRect(ret, half);
+            // 3. Final safety clamp for rect and blob
+            if (cfg.shape === 'blob') {
+              ret = clampPolyToBlob(ret, half);
+            } else if (cfg.shape === 'rect') {
+              ret = clampPolyToRect(ret, half);
+            }
             if (!ret || ret.length < 3) continue;
 
             if (cfg.curve === 'fillet') ret = applyFillets(ret);
             polys.push(ret);
+          }
+
+          unretractedCells = validRawCells;
+          if (cfg.shape === 'hexcluster') {
+            clusterBoundaryPoly = computeClusterOutline(validRawCells);
+          } else {
+            clusterBoundaryPoly = [];
           }
 
           cellPolygons = polys;
@@ -1049,6 +1174,12 @@
     document.getElementById('btn-svg').addEventListener('click', function() {
       if (!cellPolygons.length) { setStatus('No cells', 'err'); return; }
       var paths = '';
+      if (cfg.shape === 'hexcluster' && clusterBoundaryPoly.length >= 3) {
+        var bd = 'M '+clusterBoundaryPoly[0].x.toFixed(2)+' '+clusterBoundaryPoly[0].y.toFixed(2);
+        for (var j=1;j<clusterBoundaryPoly.length;j++) bd += ' L '+clusterBoundaryPoly[j].x.toFixed(2)+' '+clusterBoundaryPoly[j].y.toFixed(2);
+        bd += ' Z';
+        paths += '<path d="'+bd+'" fill="none" stroke="#000" stroke-width="2.5"/>\n';
+      }
       for (var i=0;i<cellPolygons.length;i++) {
         var p = cellPolygons[i]; if (!p||p.length<3) continue;
         var d = 'M '+p[0].x.toFixed(2)+' '+p[0].y.toFixed(2);
@@ -1121,6 +1252,7 @@
       controls.enabled = (v === 'navigate');
     });
     makeSeg('seg-shape','shape',function(){ rebuildAll(); });
+    makeSeg('seg-foci','foci',function(){ rebuildAll(); });
     makeSeg('seg-mode','mode',function(){ rebuildFromSeeds(); });
     makeSeg('seg-curve','curve',function(){ rebuildFromSeeds(); });
 
